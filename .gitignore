@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak
+venv.bak
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# Log files
+log.txt
+*.log
+
+# Operating System files
+.DS_Store
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

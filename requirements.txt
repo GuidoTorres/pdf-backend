@@ -1,0 +1,19 @@
+# Docling - Procesamiento avanzado de documentos
+docling>=1.0.0
+docling-core>=1.0.0
+docling-ibm-models>=1.0.0
+docling-parse>=1.0.0
+
+# Dependencias adicionales con versiones compatibles
+pypdfium2>=4.0.0
+pillow>=9.0.0
+numpy>=1.21.0,<2.0.0
+
+# Para crear PDFs de prueba
+reportlab>=3.6.0
+
+# OpenCV compatible con NumPy 1.x
+opencv-python-headless>=4.8.0,<4.12.0
+
+# Para el worker de procesamiento
+Flask>=2.0.0
