@@ -35,13 +35,19 @@ app.use(express.urlencoded({
 
 // Middleware para logging básico
 app.use((req, res, next) => {
+  const url = req.originalUrl;
+  // Ignorar las peticiones de status y google-callback para no ensuciar los logs
+  if (url.includes('/api/documents/status') || url.includes('/api/auth/google-callback')) {
+    return next();
+  }
+
   const start = Date.now();
   
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - Start`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${url} - Start`);
   
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${url} - ${res.statusCode} (${duration}ms)`);
   });
   
   next();

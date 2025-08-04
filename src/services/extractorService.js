@@ -1,7 +1,4 @@
 import axios from 'axios';
-import fs from 'fs/promises';
-import path from 'path';
-import os from 'os';
 import config from '../config/config.js';
 import logService from './logService.js';
 
@@ -12,21 +9,27 @@ class ExtractorService {
   }
 
   async process(pdfBuffer, fileName, userId, debug = false) {
-    let tempFilePath = null;
+    const processStartTime = Date.now();
     try {
       console.log(`[ExtractorService] Procesando ${fileName} con Docling Worker...`);
       
-      // 1. Guardar el buffer en un fichero temporal
-      const tempDir = os.tmpdir();
-      tempFilePath = path.join(tempDir, `upload_${Date.now()}_${fileName}`);
-      await fs.writeFile(tempFilePath, pdfBuffer);
-      console.log(`[ExtractorService] PDF guardado temporalmente en: ${tempFilePath}`);
+      // --- Medir conversión a Base64 ---
+      const toBase64StartTime = Date.now();
+      const pdfBase64 = pdfBuffer.toString('base64');
+      const toBase64EndTime = Date.now();
+      console.log(`[ExtractorService] [TIMER] Conversión a Base64: ${toBase64EndTime - toBase64StartTime}ms`);
 
-      // 2. Llamar al worker de Python
-      const doclingJson = await this._callDoclingWorker(tempFilePath, debug);
-      console.log(`[ExtractorService] Docling Worker exitoso para ${fileName}`);
+      // --- Medir llamada al worker de Python ---
+      const workerCallStartTime = Date.now();
+      const doclingJson = await this._callDoclingWorker(pdfBase64, debug);
+      const workerCallEndTime = Date.now();
+      console.log(`[ExtractorService] [TIMER] Llamada a Docling Worker: ${workerCallEndTime - workerCallStartTime}ms`);
       
-      return { success: true, json: doclingJson, provider: 'docling' };
+      console.log(`[ExtractorService] Docling Worker exitoso para ${fileName}`);
+      const processEndTime = Date.now();
+      console.log(`[ExtractorService] [TIMER] Tiempo total de process(): ${processEndTime - processStartTime}ms`);
+
+      return { success: true, ...doclingJson };
     } catch (e) {
       console.error(`[ExtractorService] Docling Worker falló para ${fileName}:`, e.message);
       logService.log(`[Extractor] Docling Worker failed: ${JSON.stringify({ error: e.message })}`);
@@ -35,24 +38,14 @@ class ExtractorService {
         error: e.message,
         provider: 'docling'
       };
-    } finally {
-      // 3. Limpiar el fichero temporal
-      if (tempFilePath) {
-        try {
-          await fs.unlink(tempFilePath);
-          console.log(`[ExtractorService] Fichero temporal eliminado: ${tempFilePath}`);
-        } catch (cleanError) {
-          console.error(`[ExtractorService] Error eliminando fichero temporal: ${cleanError.message}`);
-        }
-      }
     }
   }
 
-  async _callDoclingWorker(filePath, debug) {
-    console.log(`[ExtractorService] Llamando al worker en: ${this.workerUrl}`);
+  async _callDoclingWorker(pdfBase64, debug) {
+    console.log(`[ExtractorService] Llamando al worker en: ${this.workerUrl} con contenido base64.`);
     try {
       const response = await axios.post(this.workerUrl, {
-        file_path: filePath,
+        file_content_b64: pdfBase64,
         debug: debug
       }, {
         timeout: this.timeout

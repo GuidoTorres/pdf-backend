@@ -1,50 +1,79 @@
 #!/usr/bin/env python3
 """
-Docling Processing Worker
+Docling Processor Flask Worker
+
+This script acts as a web server that receives requests to process PDFs.
+It can accept either a file path or a base64-encoded file content.
 """
 
 import os
 import json
+import base64
+import tempfile
+import sys
 from flask import Flask, request, jsonify
-from docling_processor import ContextAwareProcessor
+from docling_processor import AdvancedDoclingProcessor
 
-# --- Configuración --- #
-# Usamos una variable de entorno para el modo debug, con un valor por defecto.
-DEBUG_MODE = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
-HOST = '127.0.0.1'
-PORT = 5001
-
-# --- Inicialización de la Aplicación Flask --- #
 app = Flask(__name__)
 
-# --- Carga del Modelo (se ejecuta una sola vez al iniciar el worker) --- #
-print("Initializing Docling model...")
+# Load configuration and initialize the processor once at startup
 config_path = os.path.join(os.path.dirname(__file__), 'parser_config.json')
-processor = ContextAwareProcessor(config_path, debug=DEBUG_MODE)
-print("Docling model initialized successfully.")
+try:
+    processor = AdvancedDoclingProcessor(config_path, debug=True)
+    print("[DoclingWorker] AdvancedDoclingProcessor initialized successfully.")
+except Exception as e:
+    print(f"[DoclingWorker] CRITICAL: Failed to initialize AdvancedDoclingProcessor: {e}", file=sys.stderr)
+    processor = None
 
-# --- Definición de Endpoints de la API --- #
 @app.route('/process', methods=['POST'])
-def process_pdf_endpoint():
-    """Endpoint para procesar un fichero PDF."""
-    if 'file_path' not in request.json:
-        return jsonify({"error": "Missing 'file_path' in request body"}), 400
+def process_pdf():
+    if not processor:
+        return jsonify({"error": "Processor not initialized. Check worker logs."}), 500
 
-    pdf_path = request.json['file_path']
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON request"}), 400
 
-    if not os.path.exists(pdf_path):
-        return jsonify({"error": f"File not found: {pdf_path}"}), 404
+    debug = data.get('debug', True)
+    file_path = data.get('file_path')
+    file_content_b64 = data.get('file_content_b64')
+
+    if not file_path and not file_content_b64:
+        return jsonify({"error": "Request must include either 'file_path' or 'file_content_b64'"}), 400
+
+    if file_content_b64:
+        # Handle base64 content
+        try:
+            pdf_content = base64.b64decode(file_content_b64)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(pdf_content)
+                file_path = tmp_file.name
+            print(f"[DoclingWorker] Received base64 content, saved to temporary file: {file_path}")
+        except (base64.binascii.Error, TypeError) as e:
+            return jsonify({"error": f"Invalid base64 content: {e}"}), 400
+    elif not os.path.exists(file_path):
+        return jsonify({"error": f"File not found: {file_path}"}), 404
+    else:
+        print(f"[DoclingWorker] Received request to process path: {file_path}")
 
     try:
-        # Usamos la instancia del procesador que ya está en memoria
-        result = processor.process_document(pdf_path)
+        result = processor.process_document(file_path)
+        print(f"[DoclingWorker] Successfully processed {file_path}")
         return jsonify(result)
     except Exception as e:
-        # Si algo falla, devolvemos un error claro
+        import traceback
+        print(f"[DoclingWorker] Error processing {file_path}: {e}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
         return jsonify({"error": str(e), "transactions": [], "meta": {}}), 500
+    finally:
+        # Clean up the temporary file if it was created from base64 content
+        if file_content_b64 and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                print(f"[DoclingWorker] Cleaned up temporary file: {file_path}")
+            except OSError as e:
+                print(f"[DoclingWorker] Error cleaning up temporary file {file_path}: {e}", file=sys.stderr)
 
-# --- Arranque del Servidor --- #
 if __name__ == '__main__':
-    # app.run() es ideal para desarrollo, pero para producción
-    # se recomienda usar un servidor WSGI como Gunicorn o Waitress.
-    app.run(host=HOST, port=PORT, debug=DEBUG_MODE)
+    # The server will run on port 5001 by default, which is what the Node.js service expects.
+    app.run(host='0.0.0.0', port=3005, debug=True)
