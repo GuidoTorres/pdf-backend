@@ -6,11 +6,12 @@ This script acts as a web server that receives requests to process PDFs.
 It can accept either a file path or a base64-encoded file content.
 """
 
-import os
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'python_libs'))
+
 import json
 import base64
 import tempfile
-import sys
 from flask import Flask, request, jsonify
 from docling_processor import AdvancedDoclingProcessor
 

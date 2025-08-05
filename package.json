@@ -5,9 +5,10 @@
   "main": "src/app.js",
   "type": "module",
   "scripts": {
-    "start": "concurrently \"node src/app.js\" \"FLASK_DEBUG=true python3 docling_worker.py\" \"node src/workers/pdfProcessor.js\"",
-    "dev": "concurrently \"nodemon src/app.js\" \"FLASK_DEBUG=true python3 docling_worker.py\" \"node src/workers/pdfProcessor.js\""
-  },
+    "postinstall": "pip3 install -r requirements.txt --target=./python_libs",
+    "start": "concurrently \"node src/app.js\" \"FLASK_DEBUG=true PYTHONPATH=./python_libs python3 docling_worker.py\" \"node src/workers/pdfProcessor.js\"",
+    "dev":   "concurrently \"nodemon src/app.js\" \"FLASK_DEBUG=true PYTHONPATH=./python_libs python3 docling_worker.py\" \"node src/workers/pdfProcessor.js\""
+    },
   "keywords": [],
   "author": "",
   "license": "ISC",
