@@ -1,42 +1,53 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "Backend para el conversor de estados de cuenta PDF",
-  "main": "src/app.js",
+  "description": "PDF Converter Backend API",
   "type": "module",
+  "main": "src/app.js",
   "scripts": {
-    "postinstall": "pip3 install -r requirements.txt --target=./python_libs",
-    "start": "concurrently \"node src/app.js\" \"FLASK_DEBUG=true PYTHONPATH=./python_libs python3 docling_worker.py\" \"node src/workers/pdfProcessor.js\"",
-    "dev":   "concurrently \"nodemon src/app.js\" \"FLASK_DEBUG=true PYTHONPATH=./python_libs python3 docling_worker.py\" \"node src/workers/pdfProcessor.js\""
-    },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+    "dev": "node src/app.js",
+    "start": "node src/app.js",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage"
+  },
   "dependencies": {
-    "@google-cloud/documentai": "^9.0.0",
-    "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
-    "@supabase/supabase-js": "^2.43.4",
-    "axios": "^1.7.2",
-    "bullmq": "^5.10.3",
-    "concurrently": "^8.2.2",
+    "@google-cloud/documentai": "^9.3.0",
+    "axios": "^1.5.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^4.18.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "groq-sdk": "^0.27.0",
-    "ioredis": "^5.4.1",
-    "jsonrepair": "^3.13.0",
+    "dotenv": "^16.3.1",
+    "exceljs": "^4.3.0",
+    "express": "^4.18.2",
+    "google-auth-library": "^9.0.0",
+    "googleapis": "^126.0.1",
+    "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
-    "node-poppler": "^8.0.3",
-    "pdf-extract": "^1.0.11",
+    "mysql2": "^3.6.0",
+    "node-cron": "^3.0.2",
     "pdf-parse": "^1.1.1",
-    "pdf-table-extractor": "^1.0.3",
-    "pdf-text-reader": "^5.1.0",
-    "tesseract.js": "^5.0.5",
-    "together-ai": "^0.20.0",
-    "uuid": "^11.1.0"
+    "sequelize": "^6.32.1",
+    "sharp": "^0.32.5",
+    "socket.io": "^4.7.2",
+    "winston": "^3.10.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
-  }
+    "@vitest/coverage-v8": "^1.0.0",
+    "supertest": "^6.3.3",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "pdf",
+    "converter",
+    "api",
+    "express",
+    "mysql"
+  ],
+  "author": "PDF Converter Team",
+  "license": "MIT"
 }

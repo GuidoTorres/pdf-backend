@@ -1,0 +1,414 @@
+{
+  "analysis_results": {
+    "processing_id": "proc_1756153920450_894438576399708730",
+    "timestamp": 1756153920.4501278,
+    "analysis_results": {
+      "statistical_analysis": {
+        "anomalies": [
+          {
+            "transaction_id": "0",
+            "anomaly_type": "date_too_old",
+            "severity": 0.6,
+            "description": "Date 15/01/2024 is older than expected range",
+            "field_name": "date",
+            "expected_value": null,
+            "actual_value": "15/01/2024",
+            "confidence": 0.7
+          },
+          {
+            "transaction_id": "1",
+            "anomaly_type": "date_too_old",
+            "severity": 0.6,
+            "description": "Date 16/01/2024 is older than expected range",
+            "field_name": "date",
+            "expected_value": null,
+            "actual_value": "16/01/2024",
+            "confidence": 0.7
+          },
+          {
+            "transaction_id": "2",
+            "anomaly_type": "date_too_old",
+            "severity": 0.6,
+            "description": "Date 17/01/2024 is older than expected range",
+            "field_name": "date",
+            "expected_value": null,
+            "actual_value": "17/01/2024",
+            "confidence": 0.7
+          }
+        ],
+        "metrics": {
+          "total_transactions": 3,
+          "anomaly_count": 3,
+          "anomaly_rate": 1.0,
+          "amount_statistics": {
+            "mean": 134.9,
+            "median": -45.3,
+            "std": 258.1718161741647,
+            "min": -50.0,
+            "max": 500.0,
+            "count": 3
+          },
+          "date_range": {
+            "earliest": "2024-01-15T00:00:00",
+            "latest": "2024-01-17T00:00:00",
+            "span_days": 2
+          },
+          "description_patterns": [
+            "transferencia",
+            "recibida",
+            "compra",
+            "supermercado",
+            "cajero"
+          ],
+          "confidence_distribution": {
+            "mean": 0.85,
+            "low_confidence_count": 0,
+            "high_confidence_count": 2
+          }
+        },
+        "anomaly_summary": {
+          "total": 3,
+          "by_type": {
+            "date_too_old": 3
+          },
+          "severity_distribution": {
+            "low": 0,
+            "medium": 3,
+            "high": 0
+          },
+          "average_severity": 0.6,
+          "average_confidence": 0.6999999999999998
+        }
+      },
+      "pattern_recognition": {
+        "document_classification": {
+          "document_type": "bank_statement",
+          "format_type": "pdf_native",
+          "layout_type": "tabular",
+          "confidence": 0.8300000000000001,
+          "features_used": [
+            "file_extension",
+            "file_size",
+            "page_count",
+            "text_length",
+            "line_count",
+            "word_count",
+            "table_count",
+            "has_tables",
+            "avg_table_rows",
+            "avg_table_cols",
+            "has_currency_symbols",
+            "has_dates",
+            "has_amounts",
+            "has_account_numbers",
+            "language_spanish",
+            "language_english",
+            "primary_language",
+            "confidence_score",
+            "ocr_errors"
+          ]
+        },
+        "bank_identification": {
+          "bank_name": "santander",
+          "bank_code": null,
+          "confidence": 0.6,
+          "identifying_features": [
+            "santander"
+          ],
+          "document_format": "standard"
+        }
+      },
+      "adaptive_learning": {
+        "performance_recorded": true,
+        "pattern_learning_summary": {
+          "patterns_learned": 0,
+          "message": "Insufficient data"
+        }
+      }
+    },
+    "optimization_recommendations": {
+      "configuration": {
+        "optimal_config": {
+          "text_extraction": {
+            "method": "pymupdf",
+            "extract_images": false,
+            "extract_tables": true
+          },
+          "table_detection": {
+            "method": "pdfplumber",
+            "table_settings": {
+              "vertical_strategy": "lines",
+              "horizontal_strategy": "lines",
+              "snap_tolerance": 2,
+              "join_tolerance": 2
+            }
+          },
+          "ocr": {
+            "enabled": false,
+            "method": "easyocr",
+            "languages": [
+              "en",
+              "es"
+            ],
+            "confidence_threshold": 0.5
+          },
+          "preprocessing": {
+            "image_enhancement": false,
+            "noise_reduction": false,
+            "contrast_adjustment": false
+          },
+          "validation": {
+            "nlp_validation": true,
+            "statistical_validation": true,
+            "confidence_threshold": 0.7,
+            "date_formats": [
+              "%d/%m/%Y"
+            ],
+            "amount_format": "european"
+          },
+          "document_characteristics": {
+            "file_extension": "pdf",
+            "file_size": 245760,
+            "page_count": 1,
+            "confidence_score": 0.85,
+            "table_count": 1,
+            "text_length": 209,
+            "transaction_count": 3,
+            "anomaly_rate": 1.0,
+            "format_type": "pdf_native"
+          }
+        },
+        "extraction_strategy": {
+          "primary_method": "table_extraction",
+          "fallback_method": "ocr",
+          "preprocessing": "standard",
+          "validation_level": "high",
+          "date_format": "dd/mm/yyyy",
+          "amount_format": "european",
+          "table_detection": "enhanced",
+          "parallel_processing": true,
+          "caching_enabled": true,
+          "quality_threshold": 0.6,
+          "confidence": 0.6,
+          "strategy_source": "pattern_recognition"
+        }
+      },
+      "performance": {
+        "analysis": {
+          "message": "No recent metrics available",
+          "metrics_count": 0
+        },
+        "recommendations": []
+      },
+      "comprehensive": {
+        "immediate_actions": [],
+        "configuration_changes": [
+          {
+            "priority": "medium",
+            "change": "Enhance bank identification",
+            "reason": "Low bank identification confidence: 60.00%"
+          }
+        ],
+        "quality_improvements": [
+          {
+            "priority": "high",
+            "improvement": "Reduce anomaly rate",
+            "current_rate": "100.00%",
+            "target_rate": "< 10%"
+          }
+        ],
+        "performance_optimizations": [],
+        "monitoring_alerts": []
+      }
+    },
+    "performance_metrics": {
+      "processing_id": "proc_1756153920450_894438576399708730",
+      "timestamp": "2025-08-25T15:32:00.494253",
+      "document_type": "bank_statement",
+      "bank_type": "santander",
+      "file_size": 245760,
+      "page_count": 1,
+      "total_processing_time": 0.044156789779663086,
+      "text_extraction_time": 0.0,
+      "table_detection_time": 0.0,
+      "ocr_processing_time": 0.0,
+      "validation_time": 0.0,
+      "accuracy_score": 0.0,
+      "confidence_score": 0.7150000000000001,
+      "completeness_score": 1.0,
+      "error_count": 3,
+      "methods_used": [],
+      "method_success_rates": {},
+      "method_processing_times": {},
+      "memory_usage_mb": 512.0,
+      "cpu_usage_percent": 25.0,
+      "transactions_extracted": 3,
+      "anomalies_detected": 3,
+      "success": true,
+      "error_message": null
+    }
+  },
+  "system_insights": {
+    "timestamp": 1756153920.497845,
+    "statistical_analysis": {},
+    "pattern_recognition": {
+      "document_patterns": 1,
+      "bank_patterns": 1,
+      "total_samples": 1,
+      "average_confidence": 0.8300000000000001,
+      "last_updated": "2025-08-25T15:32:00.486366"
+    },
+    "adaptive_configuration": {
+      "total_profiles": 1,
+      "average_success_rate": 0.0,
+      "total_usage_count": 1,
+      "document_type_performance": {
+        "bank_statement": {
+          "count": 1,
+          "average_success_rate": 0.0
+        }
+      },
+      "top_performing_profiles": [
+        {
+          "profile_id": "bank_statement_santander_210592185822214708",
+          "document_type": "bank_statement",
+          "bank_type": "santander",
+          "success_rate": 0.0,
+          "usage_count": 1
+        }
+      ]
+    },
+    "performance_tracking": {
+      "summary": {
+        "total_operations": 1,
+        "success_rate": 1.0,
+        "average_processing_time": 0.044156789779663086,
+        "median_processing_time": 0.044156789779663086,
+        "processing_time_std": 0.0,
+        "average_accuracy": 0.0,
+        "average_confidence": 0.7150000000000001,
+        "total_transactions_extracted": 3,
+        "total_anomalies_detected": 3,
+        "average_file_size_mb": 0.234375,
+        "operations_by_document_type": {
+          "bank_statement": 1
+        },
+        "operations_by_bank_type": {
+          "santander": 1
+        }
+      },
+      "trends": [],
+      "method_comparison": {},
+      "resource_analysis": {
+        "memory_usage": {
+          "average_mb": 512.0,
+          "peak_mb": 512.0,
+          "std_mb": 0.0
+        },
+        "cpu_usage": {
+          "average_percent": 25.0,
+          "peak_percent": 25.0,
+          "std_percent": 0.0
+        },
+        "efficiency_metrics": {
+          "mb_per_second": 5.307790742250563,
+          "time_per_mb": 0.18840230305989583
+        },
+        "resource_correlation": {
+          "memory_time_correlation": NaN,
+          "cpu_time_correlation": NaN,
+          "size_time_correlation": NaN
+        }
+      },
+      "quality_analysis": {
+        "overall_quality": {
+          "average_accuracy": 0.0,
+          "average_confidence": 0.7150000000000001,
+          "average_completeness": 1.0,
+          "average_errors": 3.0,
+          "high_quality_rate": 0.0
+        },
+        "quality_by_document_type": {
+          "bank_statement": {
+            "average_accuracy": 0.0,
+            "average_confidence": 0.7150000000000001,
+            "average_completeness": 1.0,
+            "sample_count": 1
+          }
+        },
+        "quality_distribution": {
+          "accuracy_std": 0.0,
+          "confidence_std": 0.0,
+          "low_accuracy_count": 1,
+          "low_confidence_count": 0
+        }
+      },
+      "recommendations": [
+        "OptimizationRecommendation(recommendation_id='opt_quality_1', category='quality', priority='high', description='High rate of low accuracy results (100.00%)', expected_improvement=0.25, implementation_effort='medium', specific_actions=['Enhance preprocessing for low-quality documents', 'Implement adaptive OCR settings', 'Add quality-based method selection'])"
+      ]
+    },
+    "system_health": {
+      "status": "critical",
+      "success_rate": 1.0,
+      "average_accuracy": 0.0,
+      "average_processing_time": 0.044156789779663086,
+      "total_operations": 1,
+      "recent_operations": 1,
+      "last_updated": "2025-08-25T15:32:00.494253"
+    },
+    "real_time_performance": {
+      "active_processes": 0,
+      "message": "No active processes"
+    }
+  },
+  "optimization_results": {
+    "timestamp": 1756153920.506624,
+    "optimizations_applied": [],
+    "recommendations": {
+      "performance": [],
+      "configuration": []
+    },
+    "performance_improvements": {}
+  },
+  "learning_progress": {
+    "pattern_recognition": {
+      "document_patterns": 1,
+      "bank_patterns": 1,
+      "total_samples": 1,
+      "average_confidence": 0.8300000000000001,
+      "last_updated": "2025-08-25T15:32:00.486366"
+    },
+    "adaptive_configuration": {
+      "total_profiles": 1,
+      "average_success_rate": 0.0,
+      "total_usage_count": 1,
+      "document_type_performance": {
+        "bank_statement": {
+          "count": 1,
+          "average_success_rate": 0.0
+        }
+      },
+      "top_performing_profiles": [
+        {
+          "profile_id": "bank_statement_santander_210592185822214708",
+          "document_type": "bank_statement",
+          "bank_type": "santander",
+          "success_rate": 0.0,
+          "usage_count": 1
+        }
+      ]
+    },
+    "performance_tracking": {
+      "total_operations": 1,
+      "system_health": {
+        "status": "critical",
+        "success_rate": 1.0,
+        "average_accuracy": 0.0,
+        "average_processing_time": 0.044156789779663086,
+        "total_operations": 1,
+        "recent_operations": 1,
+        "last_updated": "2025-08-25T15:32:00.494253"
+      }
+    }
+  }
+}

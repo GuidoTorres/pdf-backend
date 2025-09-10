@@ -1,12 +1,12 @@
-import supabaseService from "../services/supabaseService.js";
+import databaseService from "../services/databaseService.js";
 import logService from "../services/logService.js";
 
 class UserController {
   async getUserInfo(req, res) {
     try {
-      const userInfo = await supabaseService.getUserInfo(req.user.id);
+      const userInfo = await databaseService.getUserInfo(req.user.id);
 
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         userId: req.user.id,
         endpoint: '/user-info',
         method: 'GET',
@@ -18,7 +18,7 @@ class UserController {
     } catch (error) {
       console.error('Error getting user info:', error);
 
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         userId: req.user?.id,
         endpoint: '/user-info',
         method: 'GET',
@@ -36,8 +36,8 @@ class UserController {
 
   async getUserProfile(req, res) {
     try {
-      const userProfile = await supabaseService.getUserProfile(req.user.id);
-      await logService.logApiRequest({
+      const userProfile = await databaseService.getUserProfile(req.user.id);
+      await databaseService.logApiRequest({
         userId: req.user.id,
         endpoint: '/user/profile',
         method: 'GET',
@@ -47,7 +47,7 @@ class UserController {
       res.json(userProfile);
     } catch (error) {
       console.error('Error getting user profile:', error);
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         userId: req.user?.id,
         endpoint: '/user/profile',
         method: 'GET',
@@ -61,8 +61,8 @@ class UserController {
 
   async updateUserProfile(req, res) {
     try {
-      const updatedProfile = await supabaseService.updateUserProfile(req.user.id, req.body);
-      await logService.logApiRequest({
+      const updatedProfile = await databaseService.updateUserProfile(req.user.id, req.body);
+      await databaseService.logApiRequest({
         userId: req.user.id,
         endpoint: '/user/profile',
         method: 'PUT',
@@ -72,7 +72,7 @@ class UserController {
       res.json(updatedProfile);
     } catch (error) {
       console.error('Error updating user profile:', error);
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         userId: req.user?.id,
         endpoint: '/user/profile',
         method: 'PUT',
@@ -86,8 +86,8 @@ class UserController {
 
   async getConversions(req, res) {
     try {
-      const conversions = await supabaseService.getConversions(req.user.id);
-      await logService.logApiRequest({
+      const conversions = await databaseService.getConversions(req.user.id);
+      await databaseService.logApiRequest({
         userId: req.user.id,
         endpoint: '/user/conversions',
         method: 'GET',
@@ -97,7 +97,7 @@ class UserController {
       res.json(conversions);
     } catch (error) {
       console.error('Error getting user conversions:', error); // Log the full error object
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         userId: req.user?.id,
         endpoint: '/user/conversions',
         method: 'GET',

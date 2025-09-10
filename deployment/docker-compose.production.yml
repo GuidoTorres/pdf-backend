@@ -1,0 +1,203 @@
+# Production Docker Compose Configuration
+# Complete PDF Processing System with monitoring and logging
+
+version: "3.8"
+
+services:
+  # Main PDF Processing Application
+  pdf-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: pdf-processor-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000" # API server
+      - "8080:8080" # Health checks
+      - "9090:9090" # Metrics
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - LOG_DIR=/app/logs
+      - MIN_WORKERS=5
+      - MAX_WORKERS=15
+      - MAX_MEMORY_MB=2048
+      - MAX_CPU_PERCENT=80
+      - HEALTH_CHECK_PORT=8080
+      - METRICS_PORT=9090
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=mysql://user:password@mysql:3306/pdf_processing
+    volumes:
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+      - pdf-uploads:/app/uploads
+    depends_on:
+      - redis
+      - mysql
+    networks:
+      - pdf-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+        reservations:
+          memory: 1G
+          cpus: "1.0"
+
+  # Redis for queue management
+  redis:
+    image: redis:7-alpine
+    container_name: pdf-processor-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - pdf-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  # MySQL database
+  mysql:
+    image: mysql:8.0
+    container_name: pdf-processor-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=pdf_processing
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+    networks:
+      - pdf-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  # Nginx reverse proxy and load balancer
+  nginx:
+    image: nginx:alpine
+    container_name: pdf-processor-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - pdf-processor
+    networks:
+      - pdf-network
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pdf-processor-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=200h"
+      - "--web.enable-lifecycle"
+    networks:
+      - pdf-network
+
+  # Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pdf-processor-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - pdf-network
+
+  # Log aggregation with Fluentd
+  fluentd:
+    build:
+      context: ./monitoring/fluentd
+      dockerfile: Dockerfile
+    container_name: pdf-processor-fluentd
+    restart: unless-stopped
+    volumes:
+      - ./logs:/fluentd/log
+      - ./monitoring/fluentd/conf:/fluentd/etc
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    networks:
+      - pdf-network
+
+  # Elasticsearch for log storage
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: pdf-processor-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - pdf-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Kibana for log visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: pdf-processor-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - pdf-network
+
+volumes:
+  redis-data:
+  mysql-data:
+  prometheus-data:
+  grafana-data:
+  elasticsearch-data:
+  pdf-uploads:
+
+networks:
+  pdf-network:
+    driver: bridge

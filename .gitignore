@@ -1,11 +1,27 @@
-# Byte-compiled / optimized / DLL files
+# ===============================
+# BACKEND .GITIGNORE - StatementAI
+# ===============================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Python dependencies (if using Python services)
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
+python_libs/
+*.egg-info/
 
-# Environments
+# Environment variables - CRITICAL FOR SECURITY
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -13,19 +29,103 @@ ENV/
 env.bak
 venv.bak
 
-# Node modules
-node_modules/
-npm-debug.log*
-yarn-error.log
-
-# Log files
-log.txt
-*.log
-
-# Operating System files
-.DS_Store
-
 # Build artifacts
 build/
 dist/
-*.egg-info/
+out/
+coverage/
+
+# Logs - DO NOT COMMIT LOGS
+logs/
+*.log
+log.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
+
+# Cache directories
+.cache/
+.tmp/
+tmp/
+temp/
+.nuxt/
+.next/
+.vscode/
+.idea/
+
+# Database files - NEVER COMMIT
+*.db
+*.sqlite
+*.sqlite3
+database.json
+db_backup/
+
+# SSL certificates and keys - SECURITY CRITICAL
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+ssl/
+certificates/
+
+# Config files with secrets
+config/production.js
+config/staging.js
+secrets/
+private/
+
+# File uploads and processing
+uploads/
+downloads/
+processed/
+temp-files/
+*.pdf
+*.xlsx
+*.csv
+*.docx
+
+# Memory dumps and debugging
+heapdump-*
+*.heapsnapshot
+core.*
+
+# Coverage reports
+coverage/
+.nyc_output/
+*.lcov
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+[Tt]humbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cloud deployment
+.vercel/
+.netlify/
+.aws/
+.gcp/
+
+# Monitoring and analytics IDs - Don't expose these
+google-analytics.json
+facebook-pixel.json
+analytics-config.js

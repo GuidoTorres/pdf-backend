@@ -1,0 +1,28 @@
+[
+  {
+    "processing_id": "proc_1756153920450_894438576399708730",
+    "timestamp": "2025-08-25T15:32:00.494253",
+    "document_type": "bank_statement",
+    "bank_type": "santander",
+    "file_size": 245760,
+    "page_count": 1,
+    "total_processing_time": 0.044156789779663086,
+    "text_extraction_time": 0.0,
+    "table_detection_time": 0.0,
+    "ocr_processing_time": 0.0,
+    "validation_time": 0.0,
+    "accuracy_score": 0.0,
+    "confidence_score": 0.7150000000000001,
+    "completeness_score": 1.0,
+    "error_count": 3,
+    "methods_used": [],
+    "method_success_rates": {},
+    "method_processing_times": {},
+    "memory_usage_mb": 512.0,
+    "cpu_usage_percent": 25.0,
+    "transactions_extracted": 3,
+    "anomalies_detected": 3,
+    "success": true,
+    "error_message": null
+  }
+]

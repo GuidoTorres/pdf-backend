@@ -1,0 +1,49 @@
+{
+  "primary_tools": {
+    "text_extractor": "pymupdf",
+    "table_detector": "pdfplumber",
+    "ocr_engine": "easyocr",
+    "image_processor": "opencv",
+    "nlp_validator": "spacy"
+  },
+  "fallback_tools": {
+    "table_detector": "camelot",
+    "ocr_engine": "tesseract",
+    "image_processor": "pil"
+  },
+  "processing": {
+    "enable_parallel": true,
+    "max_workers": 2,
+    "enable_caching": true,
+    "cache_size": 50,
+    "enable_fallback": true
+  },
+  "quality_thresholds": {
+    "min_confidence": 0.7,
+    "ocr_threshold": 0.5,
+    "table_confidence": 0.8,
+    "text_quality_threshold": 0.6
+  },
+  "spacy_config": {
+    "model": "es_core_news_sm",
+    "languages": ["es", "en"],
+    "confidence_threshold": 0.5
+  },
+  "easyocr_config": {
+    "languages": ["en", "es"],
+    "gpu": true,
+    "confidence_threshold": 0.5
+  },
+  "opencv_config": {
+    "dpi": 300,
+    "enhance_contrast": true,
+    "denoise": true,
+    "sharpen": true
+  },
+  "pdfplumber_config": {
+    "vertical_strategy": "lines",
+    "horizontal_strategy": "lines",
+    "snap_tolerance": 3,
+    "join_tolerance": 3
+  }
+}

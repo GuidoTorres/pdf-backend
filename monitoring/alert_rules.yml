@@ -1,0 +1,146 @@
+# Prometheus alert rules for PDF Processing System
+
+groups:
+  - name: pdf_processor_alerts
+    rules:
+      # High memory usage alert
+      - alert: HighMemoryUsage
+        expr: system_memory_usage_percent > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% which is above the 85% threshold"
+
+      # Critical memory usage alert
+      - alert: CriticalMemoryUsage
+        expr: system_memory_usage_percent > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical memory usage detected"
+          description: "Memory usage is {{ $value }}% which is above the 95% threshold"
+
+      # High CPU usage alert
+      - alert: HighCPUUsage
+        expr: system_cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% which is above the 80% threshold for 5 minutes"
+
+      # High load average alert
+      - alert: HighLoadAverage
+        expr: system_load_average > 4
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High system load average"
+          description: "Load average is {{ $value }} which is high for this system"
+
+      # Application down alert
+      - alert: ApplicationDown
+        expr: up{job="pdf-processor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PDF Processor application is down"
+          description: "The PDF Processor application has been down for more than 1 minute"
+
+      # High event loop delay alert
+      - alert: HighEventLoopDelay
+        expr: app_event_loop_delay > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Node.js event loop delay"
+          description: "Event loop delay is {{ $value }}ms which indicates performance issues"
+
+      # Queue length alert
+      - alert: HighQueueLength
+        expr: queue_length > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High queue length detected"
+          description: "Queue length is {{ $value }} which may indicate processing bottleneck"
+
+      # Worker failure alert
+      - alert: WorkerFailures
+        expr: increase(worker_failures_total[5m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Multiple worker failures detected"
+          description: "{{ $value }} worker failures in the last 5 minutes"
+
+      # Database connection alert
+      - alert: DatabaseConnectionFailure
+        expr: database_connection_errors > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection failures"
+          description: "Database connection errors detected: {{ $value }}"
+
+      # Disk space alert
+      - alert: LowDiskSpace
+        expr: disk_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is {{ $value }}% which is above the 85% threshold"
+
+      # Processing time alert
+      - alert: SlowProcessing
+        expr: avg_processing_time > 60000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow PDF processing detected"
+          description: "Average processing time is {{ $value }}ms which is above the 60 second threshold"
+
+  - name: infrastructure_alerts
+    rules:
+      # Redis down alert
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute"
+
+      # MySQL down alert
+      - alert: MySQLDown
+        expr: up{job="mysql"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MySQL is down"
+          description: "MySQL has been down for more than 1 minute"
+
+      # Nginx down alert
+      - alert: NginxDown
+        expr: up{job="nginx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nginx is down"
+          description: "Nginx has been down for more than 1 minute"

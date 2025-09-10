@@ -1,4 +1,5 @@
 import logService from "../services/logService.js";
+import databaseService from "../services/databaseService.js";
 
 class WebhookController {
   async handleLemonSqueezyWebhook(req, res) {
@@ -34,7 +35,7 @@ class WebhookController {
       res.status(200).json({ message: 'Webhook received' });
     } catch (error) {
       console.error('Error handling Lemon Squeezy webhook:', error);
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         endpoint: '/webhook/lemonsqueezy',
         method: 'POST',
         status: 500,

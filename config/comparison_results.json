@@ -1,0 +1,73 @@
+[
+  {
+    "modern": {
+      "file": "extracto1.pdf",
+      "tables_found": 0,
+      "processing_time": 0.021495819091796875,
+      "success": true,
+      "avg_confidence": 0.0,
+      "high_confidence_tables": 0,
+      "strategies_used": [],
+      "quality_distribution": {
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      }
+    },
+    "legacy": {
+      "tables_found": 0,
+      "processing_time": 0.07368302345275879,
+      "success": false,
+      "total_cells": 0,
+      "filled_cells": 0
+    }
+  },
+  {
+    "modern": {
+      "file": "extracto2.pdf",
+      "tables_found": 1,
+      "processing_time": 0.277940034866333,
+      "success": true,
+      "avg_confidence": 0.4619999999999999,
+      "high_confidence_tables": 1,
+      "strategies_used": [
+        "text"
+      ],
+      "quality_distribution": {
+        "high": 0,
+        "medium": 0,
+        "low": 1
+      }
+    },
+    "legacy": {
+      "tables_found": 0,
+      "processing_time": 0.20284295082092285,
+      "success": false,
+      "error": "Ghostscript is not installed. You can install it using the instructions here: https://camelot-py.readthedocs.io/en/master/user/install-deps.html"
+    }
+  },
+  {
+    "modern": {
+      "file": "estado_unlocked.pdf",
+      "tables_found": 2,
+      "processing_time": 0.47489500045776367,
+      "success": true,
+      "avg_confidence": 0.7209601350270936,
+      "high_confidence_tables": 2,
+      "strategies_used": [
+        "lines"
+      ],
+      "quality_distribution": {
+        "high": 1,
+        "medium": 0,
+        "low": 1
+      }
+    },
+    "legacy": {
+      "tables_found": 0,
+      "processing_time": 0.3677847385406494,
+      "success": false,
+      "error": "Ghostscript is not installed. You can install it using the instructions here: https://camelot-py.readthedocs.io/en/master/user/install-deps.html"
+    }
+  }
+]

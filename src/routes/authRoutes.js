@@ -1,6 +1,6 @@
 import express from 'express';
 import authController from '../controllers/authController.js';
-import authMiddleware from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -10,7 +10,7 @@ router.post('/register', authController.register);
 router.post('/google-callback', authController.googleCallback);
 
 // Rutas protegidas
-router.post('/logout', authMiddleware, authController.logout);
-router.get('/me', authMiddleware, authController.getCurrentUser);
+router.post('/logout', authenticateToken, authController.logout);
+router.get('/me', authenticateToken, authController.getCurrentUser);
 
 export default router;

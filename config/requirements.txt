@@ -1,0 +1,40 @@
+# Para el worker de procesamiento
+Flask>=2.0.0
+
+# --- Enhanced Stack de Procesamiento de PDFs ---
+# Primary tools (new enhanced stack)
+pdfplumber>=0.10.0          # Modern table detection (replaces Camelot)
+easyocr>=1.7.0              # Modern OCR engine (replaces Tesseract)
+opencv-python>=4.8.0        # Advanced image preprocessing (replaces basic PIL)
+spacy>=3.7.0                # NLP validation and entity extraction
+pandas>=2.1.0               # Enhanced data manipulation (upgraded)
+openpyxl>=3.1.0             # Excel file processing
+python-docx>=0.8.11         # Word document processing
+
+# Legacy tools (kept for fallback)
+PyMuPDF>=1.23.0             # Text extraction (keeping as primary)
+camelot-py[cv]>=0.11.0      # Table detection fallback
+pytesseract>=0.3.10         # OCR fallback
+Pillow>=9.0.0               # Basic image manipulation fallback
+
+# AI/LLM API client
+groq>=0.4.0
+
+# System monitoring for resource management
+psutil>=5.8.0
+
+# Core dependencies
+numpy>=1.21.0,<2.0.0
+
+# Statistical analysis and machine learning dependencies
+scipy>=1.9.0                # Statistical analysis functions
+scikit-learn>=1.3.0         # Machine learning algorithms for pattern recognition
+matplotlib>=3.5.0           # Plotting and visualization (optional)
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-mock>=3.10.0
+
+# Additional dependencies for unified processor
+dataclasses-json>=0.5.7  # For better dataclass serialization
+typing-extensions>=4.0.0  # For better type hints support

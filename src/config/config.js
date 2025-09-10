@@ -4,28 +4,35 @@ import path from 'path';
 const config = {
   port: process.env.PORT || 3000,
   groqApiKey: process.env.GROQ_API_KEY,
-  llmProvider: process.env.LLM_PROVIDER || 'docling',
-  useDocling: true, // AGREGAR ESTA LÍNEA
+  llmProvider: process.env.LLM_PROVIDER || 'groq',
   google: {
     projectId: process.env.GOOGLE_PROJECT_ID,
     location: process.env.GOOGLE_LOCATION,
     processorId: process.env.GOOGLE_DOCAI_PROCESSOR_ID,
     endpoint: process.env.GOOGLE_DOCAI_ENDPOINT,
-    geminiApiKey: process.env.GOOGLE_GEMINI_API_KEY,
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   },
-  // Configuración de Docling
-  docling: {
-    pythonPath: process.env.DOCLING_PYTHON_PATH || 'python3',
-    scriptPath: process.env.DOCLING_SCRIPT_PATH || path.join(process.cwd(), 'backend', 'docling_processor.py'),
-    workerUrl: process.env.DOCLING_WORKER_URL || 'http://127.0.0.1:5001/process',
-    timeout: parseInt(process.env.DOCLING_TIMEOUT) || 600000, // 10 minutos para primera descarga
-    tempDir: process.env.DOCLING_TEMP_DIR || path.join(process.cwd(), 'temp')
+  database: {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
+    name: process.env.DB_NAME || 'stamentai',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    ssl: process.env.DB_SSL === 'true'
   },
-  supabase: {
-    url: process.env.SUPABASE_URL,
-    key: process.env.SUPABASE_SERVICE_KEY,
-    anonKey: process.env.SUPABASE_ANON_KEY,
+  jwt: {
+    secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   },
+  email: {
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT || 587,
+    user: process.env.EMAIL_USER,
+    password: process.env.EMAIL_PASSWORD,
+    from: process.env.EMAIL_FROM || 'noreply@stamentai.com'
+  },
+  env: process.env.NODE_ENV || 'development',
   lemonSqueezy: {
     apiKey: process.env.LEMON_SQUEEZY_API_KEY,
     webhookSecret: process.env.LEMON_SQUEEZY_WEBHOOK_SECRET,

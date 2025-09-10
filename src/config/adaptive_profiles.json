@@ -1,0 +1,68 @@
+{
+  "bank_statement_santander_210592185822214708": {
+    "profile_id": "bank_statement_santander_210592185822214708",
+    "document_type": "bank_statement",
+    "bank_type": "santander",
+    "configuration": {
+      "text_extraction": {
+        "method": "pymupdf",
+        "extract_images": false,
+        "extract_tables": true
+      },
+      "table_detection": {
+        "method": "pdfplumber",
+        "table_settings": {
+          "vertical_strategy": "lines",
+          "horizontal_strategy": "lines",
+          "snap_tolerance": 2,
+          "join_tolerance": 2
+        }
+      },
+      "ocr": {
+        "enabled": false,
+        "method": "easyocr",
+        "languages": [
+          "en",
+          "es"
+        ],
+        "confidence_threshold": 0.5
+      },
+      "preprocessing": {
+        "image_enhancement": false,
+        "noise_reduction": false,
+        "contrast_adjustment": false
+      },
+      "validation": {
+        "nlp_validation": true,
+        "statistical_validation": true,
+        "confidence_threshold": 0.7,
+        "date_formats": [
+          "%d/%m/%Y"
+        ],
+        "amount_format": "european"
+      },
+      "document_characteristics": {
+        "file_extension": "pdf",
+        "file_size": 245760,
+        "page_count": 1,
+        "confidence_score": 0.85,
+        "table_count": 1,
+        "text_length": 209,
+        "transaction_count": 3,
+        "anomaly_rate": 1.0,
+        "format_type": "pdf_native"
+      }
+    },
+    "performance_metrics": {
+      "accuracy": 0.0,
+      "processing_time": 10.0,
+      "confidence_score": 0.7150000000000001,
+      "error_rate": 1.0,
+      "extraction_completeness": 1.0
+    },
+    "usage_count": 1,
+    "success_rate": 0.0,
+    "last_updated": "2025-08-25T15:32:00.491724",
+    "created_date": "2025-08-25T15:32:00.491631"
+  }
+}

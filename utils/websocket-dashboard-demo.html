@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Dashboard Demo</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .dashboard {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+      .card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .card h3 {
+        margin-top: 0;
+        color: #333;
+      }
+      .status {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+      .status.connected {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .status.disconnected {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin: 10px 0;
+      }
+      .metric {
+        text-align: center;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+      }
+      .metric-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #007bff;
+      }
+      .metric-label {
+        font-size: 12px;
+        color: #666;
+      }
+      .log {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .log-entry {
+        margin-bottom: 5px;
+        padding: 2px 0;
+      }
+      .log-entry.info {
+        color: #007bff;
+      }
+      .log-entry.success {
+        color: #28a745;
+      }
+      .log-entry.warning {
+        color: #ffc107;
+      }
+      .log-entry.error {
+        color: #dc3545;
+      }
+      .controls {
+        margin: 20px 0;
+      }
+      .btn {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      .btn:hover {
+        background-color: #0056b3;
+      }
+      .btn.danger {
+        background-color: #dc3545;
+      }
+      .btn.danger:hover {
+        background-color: #c82333;
+      }
+      .alert {
+        padding: 12px;
+        margin: 10px 0;
+        border-radius: 4px;
+        border-left: 4px solid;
+      }
+      .alert.warning {
+        background-color: #fff3cd;
+        border-color: #ffc107;
+        color: #856404;
+      }
+      .alert.critical {
+        background-color: #f8d7da;
+        border-color: #dc3545;
+        color: #721c24;
+      }
+      .queue-status {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin: 10px 0;
+      }
+      .queue-item {
+        text-align: center;
+        padding: 10px;
+        border-radius: 4px;
+        background-color: #e9ecef;
+      }
+      .queue-item.premium {
+        background-color: #d1ecf1;
+        border: 1px solid #bee5eb;
+      }
+      .queue-item.normal {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+      }
+      .queue-item.large {
+        background-color: #fff3cd;
+        border: 1px solid #ffeaa7;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>WebSocket Dashboard Demo</h1>
+
+      <div class="controls">
+        <button class="btn" onclick="connectUser()">Connect as User</button>
+        <button class="btn" onclick="connectAdmin()">Connect as Admin</button>
+        <button class="btn danger" onclick="disconnect()">Disconnect</button>
+        <button class="btn" onclick="simulateJob()">Simulate Job</button>
+        <button class="btn" onclick="clearLog()">Clear Log</button>
+      </div>
+
+      <div class="dashboard">
+        <div class="card">
+          <h3>Connection Status</h3>
+          <p>
+            Status:
+            <span id="connectionStatus" class="status disconnected"
+              >Disconnected</span
+            >
+          </p>
+          <p>User Type: <span id="userType">None</span></p>
+          <p>User ID: <span id="userId">None</span></p>
+        </div>
+
+        <div class="card">
+          <h3>System Metrics</h3>
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric-value" id="connectedUsers">0</div>
+              <div class="metric-label">Connected Users</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="activeWorkers">0</div>
+              <div class="metric-label">Active Workers</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="totalWaiting">0</div>
+              <div class="metric-label">Jobs Waiting</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="totalActive">0</div>
+              <div class="metric-label">Jobs Active</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard">
+        <div class="card">
+          <h3>Queue Status</h3>
+          <div class="queue-status">
+            <div class="queue-item premium">
+              <div><strong>Premium Queue</strong></div>
+              <div>Waiting: <span id="premiumWaiting">0</span></div>
+              <div>Active: <span id="premiumActive">0</span></div>
+            </div>
+            <div class="queue-item normal">
+              <div><strong>Normal Queue</strong></div>
+              <div>Waiting: <span id="normalWaiting">0</span></div>
+              <div>Active: <span id="normalActive">0</span></div>
+            </div>
+            <div class="queue-item large">
+              <div><strong>Large Files Queue</strong></div>
+              <div>Waiting: <span id="largeWaiting">0</span></div>
+              <div>Active: <span id="largeActive">0</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Active Alerts</h3>
+          <div id="alertsContainer">
+            <p>No active alerts</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Event Log</h3>
+        <div id="eventLog" class="log"></div>
+      </div>
+    </div>
+
+    <script>
+      let socket = null;
+      let isAdmin = false;
+      let userId = null;
+
+      // Mock JWT tokens for demo
+      const userToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0ZXN0LXVzZXItMTIzIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzA2NzAwMDAwfQ.demo-token";
+      const adminToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhZG1pbi11c2VyLTQ1NiIsImVtYWlsIjoiYWRtaW5AZXhhbXBsZS5jb20iLCJpYXQiOjE3MDY3MDAwMDB9.demo-admin-token";
+
+      function log(message, type = "info") {
+        const logElement = document.getElementById("eventLog");
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${type}`;
+        entry.textContent = `[${timestamp}] ${message}`;
+        logElement.appendChild(entry);
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+
+      function updateConnectionStatus(
+        connected,
+        userType = "None",
+        id = "None"
+      ) {
+        const statusElement = document.getElementById("connectionStatus");
+        const userTypeElement = document.getElementById("userType");
+        const userIdElement = document.getElementById("userId");
+
+        statusElement.textContent = connected ? "Connected" : "Disconnected";
+        statusElement.className = `status ${
+          connected ? "connected" : "disconnected"
+        }`;
+        userTypeElement.textContent = userType;
+        userIdElement.textContent = id;
+      }
+
+      function updateMetrics(data) {
+        if (data.system) {
+          document.getElementById("connectedUsers").textContent =
+            data.system.connectedUsers || 0;
+          document.getElementById("activeWorkers").textContent =
+            data.system.activeWorkers || 0;
+        }
+        if (data.performance) {
+          document.getElementById("totalWaiting").textContent =
+            data.performance.totalWaitingJobs || 0;
+          document.getElementById("totalActive").textContent =
+            data.performance.totalActiveJobs || 0;
+        }
+      }
+
+      function updateQueueStatus(queues) {
+        if (queues.premium) {
+          document.getElementById("premiumWaiting").textContent =
+            queues.premium.waiting || 0;
+          document.getElementById("premiumActive").textContent =
+            queues.premium.active || 0;
+        }
+        if (queues.normal) {
+          document.getElementById("normalWaiting").textContent =
+            queues.normal.waiting || 0;
+          document.getElementById("normalActive").textContent =
+            queues.normal.active || 0;
+        }
+        if (queues.large) {
+          document.getElementById("largeWaiting").textContent =
+            queues.large.waiting || 0;
+          document.getElementById("largeActive").textContent =
+            queues.large.active || 0;
+        }
+      }
+
+      function updateAlerts(alerts) {
+        const container = document.getElementById("alertsContainer");
+
+        if (!alerts || alerts.length === 0) {
+          container.innerHTML = "<p>No active alerts</p>";
+          return;
+        }
+
+        container.innerHTML = alerts
+          .map(
+            (alert) => `
+                <div class="alert ${alert.severity}">
+                    <strong>${alert.type}:</strong> ${alert.message}
+                    <br><small>Time: ${new Date(
+                      alert.timestamp
+                    ).toLocaleString()}</small>
+                </div>
+            `
+          )
+          .join("");
+      }
+
+      function connectUser() {
+        if (socket) {
+          socket.disconnect();
+        }
+
+        socket = io("http://localhost:3000");
+        isAdmin = false;
+        userId = "test-user-123";
+
+        socket.on("connect", () => {
+          log("Connected to server", "success");
+          updateConnectionStatus(true);
+
+          // Authenticate as regular user
+          socket.emit("authenticate", { token: userToken, isAdmin: false });
+        });
+
+        socket.on("authenticated", (data) => {
+          log(`Authenticated as user: ${data.userId}`, "success");
+          updateConnectionStatus(true, "User", data.userId);
+        });
+
+        socket.on("auth-error", (error) => {
+          log(`Authentication error: ${error.message}`, "error");
+        });
+
+        setupCommonEventHandlers();
+      }
+
+      function connectAdmin() {
+        if (socket) {
+          socket.disconnect();
+        }
+
+        socket = io("http://localhost:3000");
+        isAdmin = true;
+        userId = "admin-user-456";
+
+        socket.on("connect", () => {
+          log("Connected to server as admin", "success");
+          updateConnectionStatus(true);
+
+          // Authenticate as admin
+          socket.emit("authenticate", { token: adminToken, isAdmin: true });
+        });
+
+        socket.on("authenticated", (data) => {
+          log(`Authenticated as admin: ${data.userId}`, "success");
+          updateConnectionStatus(true, "Admin", data.userId);
+
+          // Request admin metrics
+          socket.emit("request-admin-metrics");
+        });
+
+        socket.on("admin-metrics", (data) => {
+          log("Received admin metrics", "info");
+          updateMetrics(data);
+          updateQueueStatus(data.queues || {});
+          updateAlerts(data.alerts || []);
+        });
+
+        socket.on("dashboard-alert", (alert) => {
+          log(`Alert: ${alert.message}`, "warning");
+        });
+
+        socket.on("dashboard-alert-resolved", (alert) => {
+          log(`Alert resolved: ${alert.message}`, "success");
+        });
+
+        setupCommonEventHandlers();
+      }
+
+      function setupCommonEventHandlers() {
+        socket.on("disconnect", () => {
+          log("Disconnected from server", "warning");
+          updateConnectionStatus(false);
+        });
+
+        socket.on("queue-status", (data) => {
+          log("Queue status updated", "info");
+          updateQueueStatus(data.queues || {});
+          document.getElementById("totalWaiting").textContent =
+            data.totalWaiting || 0;
+          document.getElementById("totalActive").textContent =
+            data.totalActive || 0;
+          document.getElementById("activeWorkers").textContent =
+            data.activeWorkers || 0;
+        });
+
+        socket.on("job-queued", (data) => {
+          log(`Job queued: ${data.jobId} (${data.fileName})`, "info");
+        });
+
+        socket.on("job-started", (data) => {
+          log(`Job started: ${data.jobId} on worker ${data.workerId}`, "info");
+        });
+
+        socket.on("job-progress", (data) => {
+          log(
+            `Job progress: ${data.jobId} - ${data.progress}% (${data.stage})`,
+            "info"
+          );
+        });
+
+        socket.on("job-completed", (data) => {
+          log(
+            `Job completed: ${data.jobId} in ${data.processingTime}ms`,
+            "success"
+          );
+        });
+
+        socket.on("job-failed", (data) => {
+          log(`Job failed: ${data.jobId} - ${data.error}`, "error");
+        });
+
+        socket.on("test-message", (data) => {
+          log(`Test message: ${data.message}`, "info");
+        });
+      }
+
+      function disconnect() {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+          log("Manually disconnected", "warning");
+          updateConnectionStatus(false);
+        }
+      }
+
+      function simulateJob() {
+        if (!socket) {
+          log("Not connected to server", "error");
+          return;
+        }
+
+        const jobId = `job-${Date.now()}`;
+        log(`Simulating job: ${jobId}`, "info");
+
+        // Simulate job events
+        setTimeout(() => {
+          socket.emit("simulate-job-queued", {
+            jobId,
+            fileName: "demo.pdf",
+            queuePosition: 1,
+            priority: isAdmin ? "premium" : "normal",
+          });
+        }, 500);
+
+        setTimeout(() => {
+          socket.emit("simulate-job-started", {
+            jobId,
+            workerId: "worker-demo",
+          });
+        }, 2000);
+
+        setTimeout(() => {
+          socket.emit("simulate-job-progress", {
+            jobId,
+            progress: 50,
+            stage: "processing",
+          });
+        }, 4000);
+
+        setTimeout(() => {
+          socket.emit("simulate-job-completed", {
+            jobId,
+            success: true,
+            processingTime: 6000,
+          });
+        }, 6000);
+      }
+
+      function clearLog() {
+        document.getElementById("eventLog").innerHTML = "";
+      }
+
+      // Initialize
+      log("WebSocket Dashboard Demo loaded", "info");
+      log('Click "Connect as User" or "Connect as Admin" to start', "info");
+    </script>
+  </body>
+</html>

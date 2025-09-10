@@ -1,5 +1,16 @@
-import supabaseService from "../services/supabaseService.js";
+import databaseService from "../services/databaseService.js";
 import logService from "../services/logService.js";
+import jwt from 'jsonwebtoken';
+import config from '../config/config.js';
+import { User } from '../models/index.js';
+
+import { OAuth2Client } from 'google-auth-library';
+
+const client = new OAuth2Client(
+  config.google.clientId,
+  config.google.clientSecret,
+  'postmessage'
+);
 
 class AuthController {
   async login(req, res) {
@@ -13,32 +24,37 @@ class AuthController {
         });
       }
 
-      // Autenticar con Supabase
-      const { data, error } = await supabaseService.supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Buscar usuario por email
+      const user = await databaseService.findUserByEmail(email);
 
-      if (error) {
-        await logService.logApiRequest({
+      if (!user || !(await user.validatePassword(password))) {
+        await databaseService.logApiRequest({
           endpoint: '/auth/login',
           method: 'POST',
           status: 401,
-          details: { action: 'login_failed', email, error: error.message }
+          details: { action: 'login_failed', email }
         });
         
         return res.status(401).json({ 
           success: false, 
-          error: error.message 
+          error: "Credenciales inválidas" 
         });
       }
 
-      const { user, session } = data;
+      // Generar JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
+      );
+
+      // Crear sesión en la base de datos
+      await databaseService.createSession(user.id, token);
 
       // Obtener información completa del usuario
-      const userInfo = await supabaseService.getUserInfo(user.id);
+      const userInfo = await databaseService.getUserInfo(user.id);
 
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         userId: user.id,
         endpoint: '/auth/login',
         method: 'POST',
@@ -48,19 +64,14 @@ class AuthController {
 
       res.json({
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: userInfo.name || user.user_metadata?.name || user.email.split('@')[0],
-          ...userInfo
-        },
-        token: session.access_token
+        user: userInfo,
+        token
       });
 
     } catch (error) {
       console.error('[AUTH_CONTROLLER] Login error:', error);
       
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         endpoint: '/auth/login',
         method: 'POST',
         status: 500,
@@ -85,88 +96,54 @@ class AuthController {
         });
       }
 
-      // Registrar con Supabase
-      const { data, error } = await supabaseService.supabase.auth.signUp({
+      // Verificar si el usuario ya existe
+      const existingUser = await databaseService.findUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "El email ya está registrado" 
+        });
+      }
+
+      // Crear usuario
+      const user = await databaseService.createUserProfile({
         email,
         password,
-        options: {
-          data: {
-            name: name || email.split('@')[0]
-          }
-        }
+        name: name || email.split('@')[0],
+        email_verified: true // Por simplicidad, no requerimos verificación de email
       });
 
-      if (error) {
-        await logService.logApiRequest({
-          endpoint: '/auth/register',
-          method: 'POST',
-          status: 400,
-          details: { action: 'register_failed', email, error: error.message }
-        });
-        
-        return res.status(400).json({ 
-          success: false, 
-          error: error.message 
-        });
-      }
+      // Generar JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
+      );
 
-      const { user, session } = data;
+      // Crear sesión en la base de datos
+      await databaseService.createSession(user.id, token);
 
-      if (!user) {
-        return res.status(400).json({ 
-          success: false, 
-          error: "Error al crear usuario" 
-        });
-      }
+      // Obtener información completa del usuario
+      const userInfo = await databaseService.getUserInfo(user.id);
 
-      // Si hay sesión, el usuario se registró y confirmó automáticamente
-      if (session) {
-        // Crear perfil de usuario en la base de datos
-        await supabaseService.createUserProfile(user.id, {
-          name: name || email.split('@')[0],
-          email: email
-        });
+      await databaseService.logApiRequest({
+        userId: user.id,
+        endpoint: '/auth/register',
+        method: 'POST',
+        status: 201,
+        details: { action: 'register_success', email }
+      });
 
-        const userInfo = await supabaseService.getUserInfo(user.id);
-
-        await logService.logApiRequest({
-          userId: user.id,
-          endpoint: '/auth/register',
-          method: 'POST',
-          status: 201,
-          details: { action: 'register_success', email }
-        });
-
-        res.status(201).json({
-          success: true,
-          user: {
-            id: user.id,
-            email: user.email,
-            name: name || email.split('@')[0],
-            ...userInfo
-          },
-          token: session.access_token
-        });
-      } else {
-        // Usuario creado pero necesita confirmar email
-        await logService.logApiRequest({
-          endpoint: '/auth/register',
-          method: 'POST',
-          status: 201,
-          details: { action: 'register_pending_confirmation', email }
-        });
-
-        res.status(201).json({
-          success: true,
-          message: "Usuario registrado. Por favor, confirma tu email para continuar.",
-          requiresConfirmation: true
-        });
-      }
+      res.status(201).json({
+        success: true,
+        user: userInfo,
+        token
+      });
 
     } catch (error) {
       console.error('[AUTH_CONTROLLER] Register error:', error);
       
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         endpoint: '/auth/register',
         method: 'POST',
         status: 500,
@@ -182,68 +159,98 @@ class AuthController {
 
   async googleCallback(req, res) {
     try {
-      const { supabaseToken, user } = req.body;
-
-      if (!supabaseToken || !user) {
+      const { code } = req.body;
+      if (!code) {
         return res.status(400).json({ 
           success: false, 
-          error: "Token de Supabase y datos de usuario son requeridos" 
+          error: "Authorization code is required" 
         });
       }
 
-      // Verificar el token con Supabase
-      const { data: { user: verifiedUser }, error } = await supabaseService.supabase.auth.getUser(supabaseToken);
+      const { tokens } = await client.getToken(code);
+      const idToken = tokens.id_token;
 
-      if (error || !verifiedUser) {
-        await logService.logApiRequest({
-          endpoint: '/auth/google-callback',
-          method: 'POST',
-          status: 401,
-          details: { action: 'google_auth_failed', error: error?.message }
-        });
-        
-        return res.status(401).json({ 
+      if (!idToken) {
+        return res.status(400).json({ 
           success: false, 
-          error: "Token de Google inválido" 
+          error: "Failed to retrieve ID token from Google" 
         });
       }
 
-      // Verificar si el usuario ya existe en nuestra base de datos
-      let userInfo = await supabaseService.getUserInfo(verifiedUser.id);
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: config.google.clientId,
+      });
 
-      // Si no existe, crear el perfil
-      if (!userInfo || Object.keys(userInfo).length === 0) {
-        await supabaseService.createUserProfile(verifiedUser.id, {
-          name: verifiedUser.user_metadata?.full_name || verifiedUser.user_metadata?.name || verifiedUser.email.split('@')[0],
-          email: verifiedUser.email
+      const payload = ticket.getPayload();
+      if (!payload) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Failed to verify ID token" 
         });
+      }
+
+      const { sub: googleId, email, name, picture, email_verified } = payload;
+
+      if (!email || !email_verified) {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Email from Google is not verified or missing"
+        });
+      }
+
+      let user = await databaseService.findUserByGoogleId(googleId);
+
+      if (!user) {
+        user = await databaseService.findUserByEmail(email);
         
-        userInfo = await supabaseService.getUserInfo(verifiedUser.id);
+        if (user) {
+          await databaseService.updateUserProfile(user.id, { 
+            google_id: googleId,
+            name: name || user.name
+          });
+          user = await databaseService.findUserByGoogleId(googleId);
+        }
       }
 
-      await logService.logApiRequest({
-        userId: verifiedUser.id,
+      if (!user) {
+        user = await databaseService.createUserProfile({
+          email,
+          name: name || email.split('@')[0],
+          google_id: googleId,
+          email_verified: true
+        });
+      }
+
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
+      );
+
+      await databaseService.createSession(user.id, token);
+
+      const userInfo = await databaseService.getUserInfo(user.id);
+
+      await databaseService.logApiRequest({
+        userId: user.id,
         endpoint: '/auth/google-callback',
         method: 'POST',
         status: 200,
-        details: { action: 'google_auth_success', email: verifiedUser.email }
+        details: { action: 'google_auth_success', email, provider: 'google' }
       });
 
       res.json({
         success: true,
-        user: {
-          id: verifiedUser.id,
-          email: verifiedUser.email,
-          name: userInfo.name || verifiedUser.user_metadata?.full_name || verifiedUser.user_metadata?.name || verifiedUser.email.split('@')[0],
-          ...userInfo
-        },
-        token: supabaseToken
+        user: userInfo,
+        token,
+        message: 'Google authentication successful'
       });
 
     } catch (error) {
       console.error('[AUTH_CONTROLLER] Google callback error:', error);
       
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         endpoint: '/auth/google-callback',
         method: 'POST',
         status: 500,
@@ -262,11 +269,10 @@ class AuthController {
       const token = req.headers.authorization?.split(" ")[1];
       
       if (token) {
-        // Invalidar sesión en Supabase
-        await supabaseService.supabase.auth.admin.signOut(token);
+        await databaseService.revokeSession(token);
       }
 
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         userId: req.user?.id,
         endpoint: '/auth/logout',
         method: 'POST',
@@ -291,9 +297,9 @@ class AuthController {
 
   async getCurrentUser(req, res) {
     try {
-      const userInfo = await supabaseService.getUserInfo(req.user.id);
+      const userInfo = await databaseService.getUserInfo(req.user.id);
 
-      await logService.logApiRequest({
+      await databaseService.logApiRequest({
         userId: req.user.id,
         endpoint: '/auth/me',
         method: 'GET',
@@ -303,12 +309,7 @@ class AuthController {
 
       res.json({
         success: true,
-        user: {
-          id: req.user.id,
-          email: req.user.email,
-          name: userInfo.name || req.user.user_metadata?.name || req.user.email.split('@')[0],
-          ...userInfo
-        }
+        user: userInfo
       });
 
     } catch (error) {
