@@ -106,7 +106,7 @@ describe('Excel Export Integration Tests', () => {
         ]
       });
 
-      databaseService.getDocument.mockResolvedValue(bcpDocument);
+      databaseService.getDocumentById.mockResolvedValue(bcpDocument);
 
       const response = await request(app)
         .get('/api/documents/bcp-doc/export/excel')
@@ -179,7 +179,7 @@ describe('Excel Export Integration Tests', () => {
         ]
       });
 
-      databaseService.getDocument.mockResolvedValue(bbvaDocument);
+      databaseService.getDocumentById.mockResolvedValue(bbvaDocument);
 
       const response = await request(app)
         .get('/api/documents/bbva-doc/export/excel')
@@ -256,7 +256,7 @@ describe('Excel Export Integration Tests', () => {
         ]
       });
 
-      databaseService.getDocument.mockResolvedValue(multiTableDocument);
+      databaseService.getDocumentById.mockResolvedValue(multiTableDocument);
 
       const response = await request(app)
         .get('/api/documents/multi-table-doc/export/excel')
@@ -310,7 +310,7 @@ describe('Excel Export Integration Tests', () => {
         ]
       });
 
-      databaseService.getDocument.mockResolvedValue(testDocument);
+      databaseService.getDocumentById.mockResolvedValue(testDocument);
 
       const response = await request(app)
         .get('/api/documents/integrity-test-doc/export/excel')
@@ -366,7 +366,7 @@ describe('Excel Export Integration Tests', () => {
         ]
       });
 
-      databaseService.getDocument.mockResolvedValue(specialCharsDocument);
+      databaseService.getDocumentById.mockResolvedValue(specialCharsDocument);
 
       const response = await request(app)
         .get('/api/documents/special-chars-doc/export/excel')
@@ -398,7 +398,7 @@ describe('Excel Export Integration Tests', () => {
         original_file_name: 'bank_statement_january_2025.pdf'
       });
 
-      databaseService.getDocument.mockResolvedValue(downloadDocument);
+      databaseService.getDocumentById.mockResolvedValue(downloadDocument);
 
       const response = await request(app)
         .get('/api/documents/download-test-doc/export/excel')
@@ -448,7 +448,7 @@ describe('Excel Export Integration Tests', () => {
         transactions: largeTransactions
       });
 
-      databaseService.getDocument.mockResolvedValue(largeDocument);
+      databaseService.getDocumentById.mockResolvedValue(largeDocument);
 
       const response = await request(app)
         .get('/api/documents/large-file-doc/export/excel')
@@ -485,7 +485,7 @@ describe('Excel Export Integration Tests', () => {
         ]
       });
 
-      databaseService.getDocument.mockResolvedValue(documentWithoutOriginalData);
+      databaseService.getDocumentById.mockResolvedValue(documentWithoutOriginalData);
 
       const response = await request(app)
         .get('/api/documents/no-original-data-doc/export/excel')
@@ -516,7 +516,7 @@ describe('Excel Export Integration Tests', () => {
         ]
       });
 
-      databaseService.getDocument.mockResolvedValue(documentWithCorruptedStructure);
+      databaseService.getDocumentById.mockResolvedValue(documentWithCorruptedStructure);
 
       const response = await request(app)
         .get('/api/documents/corrupted-structure-doc/export/excel')
@@ -536,7 +536,7 @@ describe('Excel Export Integration Tests', () => {
     it('should handle Excel generation service errors', async () => {
       const testDocument = createMockDocument({});
 
-      databaseService.getDocument.mockResolvedValue(testDocument);
+      databaseService.getDocumentById.mockResolvedValue(testDocument);
 
       // Mock Excel service to throw error
       const originalGenerateExcel = excelExportService.generateExcel;
@@ -557,7 +557,7 @@ describe('Excel Export Integration Tests', () => {
     });
 
     it('should handle database connection errors during export', async () => {
-      databaseService.getDocument.mockRejectedValue(new Error('Database connection timeout'));
+      databaseService.getDocumentById.mockRejectedValue(new Error('Database connection timeout'));
 
       const response = await request(app)
         .get('/api/documents/db-error-doc/export/excel')
@@ -587,7 +587,7 @@ describe('Excel Export Integration Tests', () => {
         }))
       });
 
-      databaseService.getDocument.mockResolvedValue(performanceDocument);
+      databaseService.getDocumentById.mockResolvedValue(performanceDocument);
 
       const startTime = Date.now();
       

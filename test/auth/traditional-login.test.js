@@ -291,7 +291,7 @@ describe('Login Tradicional - Tests Detallados', () => {
         name: 'Token User',
         email_verified: true,
         isAdmin: false,
-        lemon_customer_id: 'cust_123'
+        paddle_customer_id: 'cust_123'
       });
     });
 

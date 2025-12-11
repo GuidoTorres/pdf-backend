@@ -5,6 +5,7 @@ import { authenticateToken } from "../middleware/auth.js";
 import excelExportService from "../services/excelExportService.js";
 import databaseService from "../services/databaseService.js";
 import logService from "../services/logService.js";
+import queueService from "../services/queueService.js";
 
 const router = express.Router();
 
@@ -59,7 +60,7 @@ router.get("/:id/download-original", async (req, res) => {
     });
 
     // Get document from database
-    const document = await databaseService.getDocument(id);
+    const document = await databaseService.getDocumentById(id);
     
     if (!document) {
       return res.status(404).json({ 
@@ -114,7 +115,7 @@ router.get("/:id/export/excel", async (req, res) => {
     });
 
     // Get document from database
-    const document = await databaseService.getDocument(id);
+    const document = await databaseService.getDocumentById(id);
     
     if (!document) {
       return res.status(404).json({ 
@@ -211,17 +212,52 @@ router.delete("/:jobId/cancel", async (req, res) => {
       userId: userId
     });
 
+    const { priorityQueueManager, pdfProcessingQueue } = await import('../config/queue.js');
+
     // Find document by job_id
-    const document = await databaseService.getDocument(jobId);
+    const document = await databaseService.getDocumentByJobId(jobId);
     
     if (!document) {
-      logService.warn('[DOCUMENT_ROUTES] Job not found for cancellation', {
-        jobId: jobId,
-        userId: userId
-      });
-      return res.status(404).json({ 
-        error: 'Job not found',
-        message: 'The requested job does not exist or has already been processed.'
+      // Document not created yet, try removing pending job directly from queue
+      const queuedJob = await queueService.getJob(jobId);
+
+      if (!queuedJob) {
+        logService.warn('[DOCUMENT_ROUTES] Job not found in queues for cancellation', {
+          jobId: jobId,
+          userId: userId
+        });
+        return res.status(404).json({ 
+          error: 'Job not found',
+          message: 'The requested job does not exist or has already been processed.'
+        });
+      }
+
+      if (queuedJob.data?.userId && queuedJob.data.userId !== userId) {
+        logService.warn('[DOCUMENT_ROUTES] Unauthorized queue job cancellation attempt', {
+          jobId,
+          userId,
+          jobOwner: queuedJob.data.userId
+        });
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'You do not have permission to cancel this job.'
+        });
+      }
+
+      const { removed } = await queueService.removeJob(jobId);
+      if (removed) {
+        logService.log('[DOCUMENT_ROUTES] Pending job removed from queue', {
+          jobId,
+          userId
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Job cancelled successfully',
+        jobId,
+        removedFromQueue: removed,
+        removedDocument: false
       });
     }
 
@@ -247,17 +283,10 @@ router.delete("/:jobId/cancel", async (req, res) => {
     }
 
     // Try to cancel the job in the queue first
+    let removedFromQueue = false;
     try {
-      const { queueManager } = await import('../services/queueManager.js');
-      const job = await queueManager.getJob(jobId);
-      
-      if (job) {
-        await job.remove();
-        logService.log('[DOCUMENT_ROUTES] Job removed from queue', {
-          jobId: jobId,
-          userId: userId
-        });
-      }
+      const { removed } = await queueService.removeJob(jobId);
+      removedFromQueue = removed;
     } catch (queueError) {
       logService.warn('[DOCUMENT_ROUTES] Failed to remove job from queue (might already be processed)', {
         jobId: jobId,
@@ -268,18 +297,21 @@ router.delete("/:jobId/cancel", async (req, res) => {
     }
 
     // Remove document from database to prevent it from reappearing
-    await databaseService.deleteDocument(document.id, userId);
+    await databaseService.deleteDocumentById(document.id, userId);
     
     logService.log('[DOCUMENT_ROUTES] Job cancelled successfully', {
       jobId: jobId,
       userId: userId,
-      documentId: document.id
+      documentId: document.id,
+      removedFromQueue
     });
 
     res.json({ 
       success: true,
       message: 'Job cancelled successfully',
-      jobId: jobId
+      jobId: jobId,
+      removedFromQueue,
+      removedDocument: true
     });
 
   } catch (error) {

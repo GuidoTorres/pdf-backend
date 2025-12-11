@@ -73,7 +73,7 @@ async function debugAmounts() {
     
     // Obtener documento de la base de datos
     console.log('\n📊 Obteniendo transacciones extraídas...');
-    const document = await databaseService.getDocument(job.id.toString());
+    const document = await databaseService.getDocumentByJobId(job.id.toString());
     
     if (!document) {
       console.error('❌ Documento no encontrado en la base de datos');

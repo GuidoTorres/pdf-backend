@@ -9,6 +9,12 @@ import ExcelJS from 'exceljs';
 // Mock dependencies
 vi.mock('../../src/services/databaseService.js');
 vi.mock('../../src/services/excelExportService.js');
+vi.mock('../../src/services/queueService.js', () => ({
+  default: {
+    getJob: vi.fn(),
+    removeJob: vi.fn()
+  }
+}));
 vi.mock('../../src/services/logService.js', () => ({
   default: {
     log: vi.fn(),
@@ -82,7 +88,7 @@ describe('Document Routes - Excel Export', () => {
   describe('GET /api/documents/:id/export/excel', () => {
     it('should successfully export document to Excel', async () => {
       // Setup mocks
-      databaseService.getDocument.mockResolvedValue(mockDocument);
+      databaseService.getDocumentById.mockResolvedValue(mockDocument);
       excelExportService.generateExcel.mockResolvedValue(mockExcelBuffer);
 
       const response = await request(app)
@@ -98,7 +104,7 @@ describe('Document Routes - Excel Export', () => {
       expect(response.body).toEqual(mockExcelBuffer);
 
       // Verify service calls
-      expect(databaseService.getDocument).toHaveBeenCalledWith('doc-123');
+      expect(databaseService.getDocumentById).toHaveBeenCalledWith('doc-123');
       expect(excelExportService.generateExcel).toHaveBeenCalledWith(mockDocument, {
         preserveOriginalStructure: true,
         includeMetadata: true,
@@ -107,7 +113,7 @@ describe('Document Routes - Excel Export', () => {
     });
 
     it('should return 404 when document not found', async () => {
-      databaseService.getDocument.mockResolvedValue(null);
+      databaseService.getDocumentById.mockResolvedValue(null);
 
       const response = await request(app)
         .get('/api/documents/nonexistent/export/excel')
@@ -127,7 +133,7 @@ describe('Document Routes - Excel Export', () => {
         user_id: 'different-user-456'
       };
       
-      databaseService.getDocument.mockResolvedValue(unauthorizedDocument);
+      databaseService.getDocumentById.mockResolvedValue(unauthorizedDocument);
 
       const response = await request(app)
         .get('/api/documents/doc-123/export/excel')
@@ -147,7 +153,7 @@ describe('Document Routes - Excel Export', () => {
         status: 'processing'
       };
       
-      databaseService.getDocument.mockResolvedValue(processingDocument);
+      databaseService.getDocumentById.mockResolvedValue(processingDocument);
 
       const response = await request(app)
         .get('/api/documents/doc-123/export/excel')
@@ -168,7 +174,7 @@ describe('Document Routes - Excel Export', () => {
         transactions: JSON.stringify([])
       };
       
-      databaseService.getDocument.mockResolvedValue(emptyDocument);
+      databaseService.getDocumentById.mockResolvedValue(emptyDocument);
 
       const response = await request(app)
         .get('/api/documents/doc-123/export/excel')
@@ -188,7 +194,7 @@ describe('Document Routes - Excel Export', () => {
         transactions: null
       };
       
-      databaseService.getDocument.mockResolvedValue(nullTransactionsDocument);
+      databaseService.getDocumentById.mockResolvedValue(nullTransactionsDocument);
 
       const response = await request(app)
         .get('/api/documents/doc-123/export/excel')
@@ -208,7 +214,7 @@ describe('Document Routes - Excel Export', () => {
         transactions: 'invalid json'
       };
       
-      databaseService.getDocument.mockResolvedValue(malformedDocument);
+      databaseService.getDocumentById.mockResolvedValue(malformedDocument);
 
       const response = await request(app)
         .get('/api/documents/doc-123/export/excel')
@@ -223,7 +229,7 @@ describe('Document Routes - Excel Export', () => {
     });
 
     it('should return 500 when Excel generation fails', async () => {
-      databaseService.getDocument.mockResolvedValue(mockDocument);
+      databaseService.getDocumentById.mockResolvedValue(mockDocument);
       excelExportService.generateExcel.mockRejectedValue(new Error('Excel generation failed'));
 
       const response = await request(app)
@@ -240,7 +246,7 @@ describe('Document Routes - Excel Export', () => {
     });
 
     it('should return 500 when database query fails', async () => {
-      databaseService.getDocument.mockRejectedValue(new Error('Database connection failed'));
+      databaseService.getDocumentById.mockRejectedValue(new Error('Database connection failed'));
 
       const response = await request(app)
         .get('/api/documents/doc-123/export/excel')
@@ -256,7 +262,7 @@ describe('Document Routes - Excel Export', () => {
     });
 
     it('should generate correct filename with timestamp', async () => {
-      databaseService.getDocument.mockResolvedValue(mockDocument);
+      databaseService.getDocumentById.mockResolvedValue(mockDocument);
       excelExportService.generateExcel.mockResolvedValue(mockExcelBuffer);
 
       const response = await request(app)
@@ -275,7 +281,7 @@ describe('Document Routes - Excel Export', () => {
         original_file_name: null
       };
       
-      databaseService.getDocument.mockResolvedValue(documentWithoutName);
+      databaseService.getDocumentById.mockResolvedValue(documentWithoutName);
       excelExportService.generateExcel.mockResolvedValue(mockExcelBuffer);
 
       const response = await request(app)
@@ -301,7 +307,7 @@ describe('Document Routes - Excel Export', () => {
         ]
       };
       
-      databaseService.getDocument.mockResolvedValue(documentWithArrayTransactions);
+      databaseService.getDocumentById.mockResolvedValue(documentWithArrayTransactions);
       excelExportService.generateExcel.mockResolvedValue(mockExcelBuffer);
 
       const response = await request(app)
@@ -322,7 +328,7 @@ describe('Document Routes - Excel Export', () => {
       vi.unmock('../../src/services/excelExportService.js');
       const realExcelService = await import('../../src/services/excelExportService.js');
       
-      databaseService.getDocument.mockResolvedValue(mockDocument);
+      databaseService.getDocumentById.mockResolvedValue(mockDocument);
 
       const response = await request(app)
         .get('/api/documents/doc-123/export/excel')

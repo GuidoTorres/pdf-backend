@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import { createServer } from "http";
 import config from "./config/config.js";
 import database from "./config/database.js";
@@ -13,11 +14,25 @@ import webSocketManager from "./services/websocketManager.js";
 import dashboardService from "./services/dashboardService.js";
 import logService from "./services/logService.js";
 import workerManager from "./workers/workerManager.js";
+import {
+  startSubscriptionScheduler,
+  stopSubscriptionScheduler,
+} from "./services/subscriptionScheduler.js";
+import { generalLimiter } from "./middleware/rateLimiter.js";
 
 // Initialize database models
 import "./models/index.js";
 
 const app = express();
+
+app.set("trust proxy", 1);
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+    contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+  })
+);
 
 app.use(
   cors({
@@ -25,6 +40,8 @@ app.use(
       "http://localhost:5173",
       "http://localhost:3000",
       "http://127.0.0.1:5173",
+      "https://fluentlabs.cloud",
+      "https://www.fluentlabs.cloud",
       "https://pdf-converter-sable.vercel.app",
     ],
     credentials: true,
@@ -35,6 +52,8 @@ app.use(
     optionsSuccessStatus: 204,
   })
 );
+
+app.use("/api/", generalLimiter);
 
 // Aumentar límites para archivos grandes
 app.use(
@@ -56,7 +75,7 @@ app.use(
 // Middleware para logging básico
 app.use((req, res, next) => {
   const url = req.originalUrl;
-  // Ignorar las peticiones de status y google-callback para no ensuciar los logs
+
   if (
     url.includes("/api/documents/status") ||
     url.includes("/api/auth/google-callback")
@@ -64,17 +83,22 @@ app.use((req, res, next) => {
     return next();
   }
 
-  const start = Date.now();
-
-  console.log(`[${new Date().toISOString()}] ${req.method} ${url} - Start`);
+  const start = process.hrtime.bigint();
+  logService.info("request:start", {
+    method: req.method,
+    url,
+    ip: req.ip,
+  });
 
   res.on("finish", () => {
-    const duration = Date.now() - start;
-    console.log(
-      `[${new Date().toISOString()}] ${req.method} ${url} - ${
-        res.statusCode
-      } (${duration}ms)`
-    );
+    const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+    logService.info("request:complete", {
+      method: req.method,
+      url,
+      statusCode: res.statusCode,
+      durationMs: Number(durationMs.toFixed(2)),
+      contentLength: res.getHeader("Content-Length"),
+    });
   });
 
   next();
@@ -85,17 +109,21 @@ app.use((req, res, next) => {
   const timeout = req.originalUrl.includes("/documents") ? 300000 : 30000;
 
   req.setTimeout(timeout, () => {
-    console.log(
-      `[${new Date().toISOString()}] Request timeout for ${req.method} ${
-        req.originalUrl
-      }`
-    );
+    logService.warn("request:timeout", {
+      method: req.method,
+      url: req.originalUrl,
+    });
     if (!res.headersSent) {
       res.status(408).json({ error: "Request timeout" });
     }
   });
 
   next();
+});
+
+// Health check endpoint
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // Registrar todas las rutas
@@ -108,10 +136,12 @@ app.use("/api/dashboard", dashboardRoutes);
 
 // Manejador de errores global
 app.use((err, req, res, next) => {
-  console.error(
-    `[${new Date().toISOString()}] Global error handler:`,
-    err.stack
-  );
+  logService.error("request:error", {
+    method: req.method,
+    url: req.originalUrl,
+    message: err.message,
+    stack: err.stack,
+  });
 
   if (res.headersSent) {
     return next(err);
@@ -155,6 +185,8 @@ async function startServer() {
     await workerManager.initialize();
     console.log("[APP] Workers initialized");
 
+    startSubscriptionScheduler();
+
     // Start server
     server.listen(config.port, () => {
       console.log(`[APP] Servidor corriendo en el puerto ${config.port}`);
@@ -170,6 +202,7 @@ async function startServer() {
     process.on("SIGTERM", async () => {
       console.log("[APP] SIGTERM received, shutting down gracefully");
       dashboardService.stopMetricsCollection();
+      await stopSubscriptionScheduler();
       await workerManager.close();
       server.close(() => {
         database.close();

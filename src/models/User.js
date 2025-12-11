@@ -31,11 +31,11 @@ const User = sequelize.define('User', {
     allowNull: true,
     unique: true
   },
-  lemon_customer_id: {
+  paddle_customer_id: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  lemon_checkout_id: {
+  paddle_checkout_id: {
     type: DataTypes.STRING,
     allowNull: true
   },

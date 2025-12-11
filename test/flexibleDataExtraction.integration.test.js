@@ -370,7 +370,7 @@ describe('Flexible Data Extraction API Integration Tests', () => {
       expect(result).toBe(true);
 
       // Verify document was updated
-      const updatedDocument = await databaseService.getDocument(testDocument.job_id);
+      const updatedDocument = await databaseService.getDocumentByJobId(testDocument.job_id);
       expect(updatedDocument.extract_type).toBe('credit_card_statement');
       expect(updatedDocument.bank_type).toBe('bbva');
       expect(updatedDocument.format_version).toBe('v1.0');

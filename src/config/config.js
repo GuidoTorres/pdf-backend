@@ -33,13 +33,15 @@ const config = {
     from: process.env.EMAIL_FROM || 'noreply@stamentai.com'
   },
   env: process.env.NODE_ENV || 'development',
-  lemonSqueezy: {
-    apiKey: process.env.LEMON_SQUEEZY_API_KEY,
-    webhookSecret: process.env.LEMON_SQUEEZY_WEBHOOK_SECRET,
-    variants: {
-      starter: process.env.LEMON_SQUEEZY_STARTER_VARIANT_ID,
-      pro: process.env.LEMON_SQUEEZY_PRO_VARIANT_ID,
-      business: process.env.LEMON_SQUEEZY_BUSINESS_VARIANT_ID,
+  paddle: {
+    vendorId: process.env.PADDLE_VENDOR_ID,
+    apiKey: process.env.PADDLE_API_KEY,
+    publicKey: process.env.PADDLE_PUBLIC_KEY,
+    webhookSecret: process.env.PADDLE_WEBHOOK_SECRET,
+    products: {
+      starter: process.env.PADDLE_PRODUCT_STARTER_ID,
+      pro: process.env.PADDLE_PRODUCT_PRO_ID,
+      business: process.env.PADDLE_PRODUCT_BUSINESS_ID,
     },
   },
   subscriptionPlans: {

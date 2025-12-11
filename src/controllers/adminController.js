@@ -6,7 +6,7 @@ import {
   PaymentLog,
 } from "../models/index.js";
 import { Op } from "sequelize";
-import logService from "../services/logService.js";
+import logService, { getRecentJobMetrics } from "../services/logService.js";
 import webSocketManager from "../services/websocketManager.js";
 import dashboardService from "../services/dashboardService.js";
 
@@ -44,7 +44,7 @@ class AdminController {
         Document.count({ where: { createdAt: { [Op.gte]: last7Days } } }),
         Document.count({ where: { createdAt: { [Op.gte]: yesterday } } }),
         Subscription.count({ where: { plan: { [Op.ne]: "free" } } }),
-        PaymentLog.sum("amount") || 0,
+        this.sumPaymentAmount(),
         this.getSystemHealthSummary(),
       ]);
 
@@ -646,6 +646,22 @@ class AdminController {
     }
   }
 
+  async getProcessingMetrics(req, res) {
+    try {
+      const metrics = getRecentJobMetrics();
+      res.json({
+        success: true,
+        data: metrics,
+      });
+    } catch (error) {
+      logService.error("Error retrieving processing metrics:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get processing metrics",
+      });
+    }
+  }
+
   /**
    * Get revenue statistics
    */
@@ -657,7 +673,7 @@ class AdminController {
 
       const [totalRevenue, monthlyRevenue, revenueByPlan, revenueTrend] =
         await Promise.all([
-          PaymentLog.sum("amount") || 0,
+          this.sumPaymentAmount(),
           this.getMonthlyRevenue(),
           this.getRevenueByPlan(),
           this.getRevenueTrend(days),
@@ -1058,19 +1074,37 @@ class AdminController {
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const result = await PaymentLog.sum("amount", {
-      where: {
-        createdAt: { [Op.gte]: startOfMonth },
-      },
+    return this.sumPaymentAmount({
+      createdAt: { [Op.gte]: startOfMonth },
     });
+  }
 
-    return result || 0;
+  async sumPaymentAmount(where = undefined) {
+    const hasAmountColumn =
+      PaymentLog?.rawAttributes && "amount" in PaymentLog.rawAttributes;
+
+    if (!hasAmountColumn) {
+      return 0;
+    }
+
+    try {
+      const result = await PaymentLog.sum("amount", {
+        where,
+      });
+      return result || 0;
+    } catch (error) {
+      logService.warn("Failed to aggregate payment amounts", {
+        error: error.message,
+      });
+      return 0;
+    }
   }
 
   async getSystemHealthSummary() {
     try {
       const dashboardStatus = dashboardService.getStatus();
       const wsStatus = webSocketManager.getConnectedUsersCount();
+      const adminMetrics = webSocketManager.getAdminMetrics();
 
       return {
         status: "healthy",
@@ -1078,6 +1112,7 @@ class AdminController {
         memory: process.memoryUsage(),
         connectedUsers: wsStatus,
         dashboardActive: dashboardStatus.isCollecting,
+        metrics: adminMetrics,
         lastCheck: new Date().toISOString(),
       };
     } catch (error) {

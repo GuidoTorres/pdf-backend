@@ -81,7 +81,7 @@ class DatabaseService {
 
   async getUserProfile(userId) {
     return await User.findByPk(userId, {
-      attributes: ['id', 'email', 'name', 'lemon_customer_id']
+      attributes: ['id', 'email', 'name', 'paddle_customer_id']
     });
   }
 
@@ -147,12 +147,12 @@ class DatabaseService {
   async updateSubscription(subscriptionData) {
     const { customer_id, checkout_id } = subscriptionData;
 
-    // Buscar usuario por customer_id o checkout_id
+    // Buscar usuario por customer_id o checkout_id de Paddle
     const user = await User.findOne({
       where: {
         [User.sequelize.Sequelize.Op.or]: [
-          { lemon_customer_id: customer_id },
-          { lemon_checkout_id: checkout_id }
+          { paddle_customer_id: customer_id },
+          { paddle_checkout_id: checkout_id }
         ]
       }
     });
@@ -162,12 +162,24 @@ class DatabaseService {
     }
 
     // Actualizar o crear suscripción
+    const plan = subscriptionData.plan || 'free';
+    const defaultPages = Subscription.getDefaultPagesForPlan(plan);
+    const pagesRemaining =
+      subscriptionData.pages_remaining ?? defaultPages ?? 0;
+
+    const renewedAt = subscriptionData.renewed_at
+      ? new Date(subscriptionData.renewed_at)
+      : new Date();
+    const nextReset = subscriptionData.next_reset
+      ? new Date(subscriptionData.next_reset)
+      : new Date(renewedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+
     const [subscription] = await Subscription.upsert({
       user_id: user.id,
-      plan: subscriptionData.plan,
-      pages_remaining: subscriptionData.pages_remaining,
-      renewed_at: subscriptionData.renewed_at,
-      next_reset: subscriptionData.next_reset
+      plan,
+      pages_remaining: pagesRemaining,
+      renewed_at: renewedAt,
+      next_reset: nextReset,
     });
 
     return subscription;
@@ -196,16 +208,39 @@ class DatabaseService {
     return await Document.create(documentData);
   }
 
-  async getDocument(jobId) {
+  async getDocument(identifier) {
+    if (!identifier) {
+      return null;
+    }
+
+    const byJob = await Document.findOne({
+      where: { job_id: identifier }
+    });
+
+    if (byJob) {
+      return byJob;
+    }
+
+    // Fallback to primary key lookup if not found by job_id
+    try {
+      return await Document.findByPk(identifier);
+    } catch (error) {
+      console.warn('[DATABASE_SERVICE] Failed document lookup by ID', {
+        identifier,
+        error: error.message
+      });
+      return null;
+    }
+  }
+
+  async getDocumentByJobId(jobId) {
     return await Document.findOne({
       where: { job_id: jobId }
     });
   }
 
   async updateDocument(jobId, updateData) {
-    const document = await Document.findOne({
-      where: { job_id: jobId }
-    });
+    const document = await this.getDocumentByJobId(jobId);
 
     if (!document) {
       throw new Error('Documento no encontrado');
@@ -221,17 +256,11 @@ class DatabaseService {
     });
   }
 
-  async getDocumentByJobId(jobId) {
-    return await Document.findOne({
-      where: { job_id: jobId }
-    });
-  }
-
   async getDocumentById(id) {
     return await Document.findByPk(id);
   }
 
-  async deleteDocument(documentId, userId) {
+  async deleteDocumentById(documentId, userId) {
     const document = await Document.findOne({
       where: { 
         id: documentId,
@@ -244,6 +273,21 @@ class DatabaseService {
     }
 
     return await document.destroy();
+  }
+
+  async deleteDocument(identifier, userId = null) {
+    const document = await this.getDocument(identifier);
+
+    if (!document) {
+      throw new Error('Document not found');
+    }
+
+    if (userId && document.user_id !== userId) {
+      throw new Error('Access denied');
+    }
+
+    await document.destroy();
+    return true;
   }
 
   // Auth methods

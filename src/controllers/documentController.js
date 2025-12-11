@@ -1,266 +1,18 @@
-import { pdfProcessingQueue, priorityQueueManager } from '../config/queue.js';
+import { priorityQueueManager } from '../config/queue.js';
 import logService from '../services/logService.js';
 import databaseService from '../services/databaseService.js';
 import userService from '../services/userService.js';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-
-/**
- * Enhance transactions with original amount sign data and flexible structure data from document
- * @param {Array} transactions - Array of transaction objects
- * @param {Object} document - Document object with original amount data and flexible structure
- * @returns {Object} Enhanced transactions with both normalized and original data
- */
-function enhanceTransactionsWithOriginalData(transactions, document) {
-  if (!Array.isArray(transactions)) {
-    return { transactions, originalTransactions: null };
-  }
-
-  // Get flexible extraction data
-  let flexibleData = {};
-  try {
-    flexibleData = document.getFlexibleExtractionData();
-  } catch (error) {
-    logService.warn('[DOCUMENT_CONTROLLER] Error getting flexible data during transaction enhancement', {
-      jobId: document.job_id,
-      error: error.message
-    });
-    flexibleData = {};
-  }
-
-  // Enhanced normalized transactions (existing functionality)
-  const enhancedTransactions = transactions.map(transaction => {
-    // Preserve existing transaction data and add original amount information
-    const enhancedTransaction = {
-      ...transaction,
-      // Add original amount data if available at document level
-      ...(document.original_credit !== null && { document_original_credit: document.original_credit }),
-      ...(document.original_debit !== null && { document_original_debit: document.original_debit }),
-      ...(document.original_amount !== null && { document_original_amount: document.original_amount }),
-      ...(document.sign_detection_method && { sign_detection_method: document.sign_detection_method })
-    };
-
-    // If transaction already has individual original values, preserve them
-    // (these would come from the transaction extraction process)
-    if (transaction.original_credit !== undefined) {
-      enhancedTransaction.original_credit = transaction.original_credit;
-    }
-    if (transaction.original_debit !== undefined) {
-      enhancedTransaction.original_debit = transaction.original_debit;
-    }
-    if (transaction.original_amount !== undefined) {
-      enhancedTransaction.original_amount = transaction.original_amount;
-    }
-    if (transaction.confidence !== undefined) {
-      enhancedTransaction.confidence = transaction.confidence;
-    }
-
-    return enhancedTransaction;
-  });
-
-  // Create original transactions preserving raw structure
-  let originalTransactions = null;
-  if (transactions.length > 0) {
-    // Check if any transaction has original_data (from new Python processor)
-    const hasOriginalData = transactions.some(t => t.original_data);
-    
-    if (hasOriginalData || flexibleData.original_structure) {
-      originalTransactions = transactions.map(transaction => {
-        // If transaction has original_data field (from Python processor), use it
-        if (transaction.original_data) {
-          return {
-            id: transaction.id,
-            ...transaction.original_data,
-            // Add transformation metadata
-            _transformationMetadata: transaction.transformationMetadata || {
-              sourceColumns: [],
-              transformationRules: [],
-              confidence: 1.0,
-              preservationFlags: {
-                originalFormatPreserved: true,
-                dataTypesPreserved: true,
-                allColumnsIncluded: true
-              }
-            }
-          };
-        }
-        
-        // Fallback: create original format from normalized data
-        return {
-          id: transaction.id,
-          // Map normalized fields back to original column names if mappings exist
-          ...(flexibleData.column_mappings ? 
-            mapNormalizedToOriginal(transaction, flexibleData.column_mappings) : 
-            transaction),
-          _transformationMetadata: {
-            sourceColumns: Object.keys(transaction),
-            transformationRules: ['fallback_mapping'],
-            confidence: 0.7,
-            preservationFlags: {
-              originalFormatPreserved: false,
-              dataTypesPreserved: true,
-              allColumnsIncluded: false
-            }
-          }
-        };
-      });
-    }
-  }
-
-  // Log enhancement quality metrics
-  logTransactionEnhancementMetrics(enhancedTransactions, document, originalTransactions);
-
-  return {
-    transactions: enhancedTransactions,
-    originalTransactions
-  };
-}
-
-/**
- * Map normalized transaction data back to original column names
- * @param {Object} transaction - Normalized transaction
- * @param {Object} columnMappings - Column mapping configuration
- * @returns {Object} Transaction with original column names
- */
-function mapNormalizedToOriginal(transaction, columnMappings) {
-  if (!columnMappings || !Array.isArray(columnMappings)) {
-    return transaction;
-  }
-
-  const originalTransaction = {};
-  
-  // Standard field mappings
-  const standardMappings = {
-    date: ['fecha', 'fecha_operacion', 'date'],
-    description: ['concepto', 'descripcion', 'description'],
-    amount: ['importe', 'monto', 'amount'],
-    type: ['tipo', 'type'],
-    balance: ['saldo', 'balance']
-  };
-
-  // Apply reverse mappings from column mappings
-  columnMappings.forEach(tableMapping => {
-    if (tableMapping.columnMappings) {
-      tableMapping.columnMappings.forEach(colMapping => {
-        const normalizedName = colMapping.normalizedName;
-        const originalName = colMapping.originalName;
-        
-        if (transaction[normalizedName] !== undefined) {
-          originalTransaction[originalName] = transaction[normalizedName];
-        }
-      });
-    }
-  });
-
-  // Fill in any missing mappings using standard mappings
-  Object.entries(standardMappings).forEach(([normalizedField, possibleOriginalNames]) => {
-    if (transaction[normalizedField] !== undefined) {
-      // Find if we already mapped this field
-      const alreadyMapped = Object.values(originalTransaction).includes(transaction[normalizedField]);
-      
-      if (!alreadyMapped) {
-        // Use the first possible original name as fallback
-        const originalName = possibleOriginalNames[0];
-        originalTransaction[originalName] = transaction[normalizedField];
-      }
-    }
-  });
-
-  return originalTransaction;
-}
-
-/**
- * Log metrics about transaction enhancement quality
- * @param {Array} transactions - Enhanced transactions
- * @param {Object} document - Document object
- * @param {Array} originalTransactions - Original format transactions
- */
-function logTransactionEnhancementMetrics(transactions, document, originalTransactions = null) {
-  if (!Array.isArray(transactions) || transactions.length === 0) {
-    return;
-  }
-
-  const metrics = {
-    totalTransactions: transactions.length,
-    withOriginalCredit: 0,
-    withOriginalDebit: 0,
-    withOriginalAmount: 0,
-    withConfidence: 0,
-    signDetectionMethod: document.sign_detection_method,
-    averageConfidence: 0,
-    // Flexible extraction metrics
-    hasOriginalTransactions: originalTransactions !== null,
-    originalTransactionCount: originalTransactions ? originalTransactions.length : 0,
-    extractType: document.extract_type,
-    bankType: document.bank_type,
-    hasOriginalStructure: document.hasOriginalStructure ? document.hasOriginalStructure() : false
-  };
-
-  let confidenceSum = 0;
-  let confidenceCount = 0;
-
-  transactions.forEach(transaction => {
-    if (transaction.original_credit !== undefined && transaction.original_credit !== null) {
-      metrics.withOriginalCredit++;
-    }
-    if (transaction.original_debit !== undefined && transaction.original_debit !== null) {
-      metrics.withOriginalDebit++;
-    }
-    if (transaction.original_amount !== undefined && transaction.original_amount !== null) {
-      metrics.withOriginalAmount++;
-    }
-    if (transaction.confidence !== undefined && transaction.confidence !== null) {
-      metrics.withConfidence++;
-      confidenceSum += transaction.confidence;
-      confidenceCount++;
-    }
-  });
-
-  if (confidenceCount > 0) {
-    metrics.averageConfidence = confidenceSum / confidenceCount;
-  }
-
-  // Calculate original transaction preservation metrics
-  if (originalTransactions) {
-    let preservationSum = 0;
-    let preservationCount = 0;
-    
-    originalTransactions.forEach(originalTx => {
-      if (originalTx._transformationMetadata && originalTx._transformationMetadata.confidence) {
-        preservationSum += originalTx._transformationMetadata.confidence;
-        preservationCount++;
-      }
-    });
-    
-    if (preservationCount > 0) {
-      metrics.averagePreservationConfidence = preservationSum / preservationCount;
-    }
-  }
-
-  // Log warning if confidence is low
-  if (metrics.averageConfidence > 0 && metrics.averageConfidence < 0.7) {
-    logService.warn('[DOCUMENT_CONTROLLER] Low confidence in sign detection', {
-      jobId: document.job_id,
-      averageConfidence: metrics.averageConfidence,
-      signDetectionMethod: document.sign_detection_method
-    });
-  }
-
-  // Log warning if preservation confidence is low
-  if (metrics.averagePreservationConfidence && metrics.averagePreservationConfidence < 0.8) {
-    logService.warn('[DOCUMENT_CONTROLLER] Low confidence in original structure preservation', {
-      jobId: document.job_id,
-      averagePreservationConfidence: metrics.averagePreservationConfidence,
-      extractType: document.extract_type
-    });
-  }
-
-  logService.log('[DOCUMENT_CONTROLLER] Transaction enhancement metrics', {
-    jobId: document.job_id,
-    ...metrics
-  });
-}
+import queueService from '../services/queueService.js';
+import {
+  enhanceTransactionsWithOriginalData,
+  getFlexibleData,
+  parseTransactions,
+  parseMetadata,
+  parseJsonField
+} from '../utils/documentDataUtils.js';
 
 async function processDocument(req, res) {
   if (!req.file) {
@@ -382,44 +134,20 @@ async function getJobStatus(req, res) {
 
   try {
     // Primero intentar obtener de la base de datos
-    const document = await databaseService.getDocument(jobId);
+    const document = await databaseService.getDocumentByJobId(jobId);
     
     if (document) {
-      let transactions = null;
-      let metadata = null;
-      
-      // Parse transactions if they exist
+      const rawTransactions = parseTransactions(document);
+      let transactions = rawTransactions;
       let originalTransactions = null;
-      if (document.transactions) {
-        try {
-          const rawTransactions = typeof document.transactions === 'string' 
-            ? JSON.parse(document.transactions) 
-            : document.transactions;
-          
-          // Enhance transactions with original amount sign data and flexible structure
-          if (Array.isArray(rawTransactions)) {
-            const enhancedResult = enhanceTransactionsWithOriginalData(rawTransactions, document);
-            transactions = enhancedResult.transactions;
-            originalTransactions = enhancedResult.originalTransactions;
-          }
-        } catch (parseErr) {
-          logService.error('[DOCUMENT_CONTROLLER] Error parsing transactions JSON:', parseErr);
-          transactions = [];
-          originalTransactions = null;
-        }
+
+      if (rawTransactions.length > 0) {
+        const enhancedResult = enhanceTransactionsWithOriginalData(rawTransactions, document);
+        transactions = enhancedResult.transactions;
+        originalTransactions = enhancedResult.originalTransactions;
       }
-      
-      // Parse metadata if it exists
-      if (document.metadata) {
-        try {
-          metadata = typeof document.metadata === 'string' 
-            ? JSON.parse(document.metadata) 
-            : document.metadata;
-        } catch (parseErr) {
-          logService.error('[DOCUMENT_CONTROLLER] Error parsing metadata JSON:', parseErr);
-          metadata = null;
-        }
-      }
+
+      const metadata = parseMetadata(document);
       
       // Log sign detection information for monitoring
       if (document.sign_detection_method) {
@@ -434,28 +162,8 @@ async function getJobStatus(req, res) {
       }
       
       // Get flexible extraction data with error handling
-      let flexibleData = {};
-      let hasOriginalStructure = false;
-      
-      try {
-        flexibleData = document.getFlexibleExtractionData();
-        hasOriginalStructure = document.hasOriginalStructure();
-      } catch (flexibleDataError) {
-        logService.warn('[DOCUMENT_CONTROLLER] Error retrieving flexible extraction data', {
-          jobId: document.job_id,
-          error: flexibleDataError.message
-        });
-        // Set default values if flexible data retrieval fails
-        flexibleData = {
-          original_structure: null,
-          column_mappings: null,
-          extract_type: null,
-          bank_type: null,
-          format_version: null,
-          preservation_metadata: null
-        };
-        hasOriginalStructure = false;
-      }
+      const flexibleData = getFlexibleData(document);
+      const hasOriginalStructure = flexibleData.hasOriginalStructure || false;
       
       res.json({
         jobId: document.job_id,
@@ -490,13 +198,8 @@ async function getJobStatus(req, res) {
       return;
     }
 
-    // Si no está en la BD, intentar obtener de las colas de prioridad (fallback)
-    let job = await priorityQueueManager.getJob(jobId);
-    
-    // If not found in priority queues, try legacy queue for backward compatibility
-    if (!job) {
-      job = await pdfProcessingQueue.getJob(jobId);
-    }
+    // Si no está en la BD, intentar obtenerlo desde las colas
+    const job = await queueService.getJob(jobId);
 
     if (!job) {
       return res.status(404).json({ error: 'Job not found.' });
@@ -539,78 +242,29 @@ async function getHistory(req, res) {
     
     // Enhance documents with parsed transactions and original amount data
     const enhancedDocuments = documents.map(document => {
-      let transactions = null;
-      let metadata = null;
-      
-      // Parse transactions if they exist
+      const rawTransactions = parseTransactions(document);
+      let transactions = rawTransactions;
       let originalTransactions = null;
-      if (document.transactions) {
-        try {
-          const rawTransactions = typeof document.transactions === 'string' 
-            ? JSON.parse(document.transactions) 
-            : document.transactions;
-          
-          // Enhance transactions with original amount data and flexible structure
-          if (Array.isArray(rawTransactions)) {
-            const enhancedResult = enhanceTransactionsWithOriginalData(rawTransactions, document);
-            transactions = enhancedResult.transactions;
-            originalTransactions = enhancedResult.originalTransactions;
-          }
-        } catch (parseErr) {
-          logService.error('[DOCUMENT_CONTROLLER] Error parsing transactions JSON in history:', parseErr);
-          transactions = [];
-          originalTransactions = null;
-        }
+
+      if (rawTransactions.length > 0) {
+        const enhancedResult = enhanceTransactionsWithOriginalData(rawTransactions, document);
+        transactions = enhancedResult.transactions;
+        originalTransactions = enhancedResult.originalTransactions;
       }
 
-      // Parse originalTransactions from database if they exist
-      // Check both camelCase and snake_case field names
-      let dbOriginalTransactions = null;
       const originalTransactionsField = document.originalTransactions || document.original_transactions;
-      if (originalTransactionsField) {
-        try {
-          dbOriginalTransactions = typeof originalTransactionsField === 'string' 
-            ? JSON.parse(originalTransactionsField) 
-            : originalTransactionsField;
-          console.log(`[DOCUMENT_CONTROLLER] Parsed originalTransactions from DB: ${dbOriginalTransactions?.length || 0} items for document ${document.id}`);
-        } catch (parseErr) {
-          logService.error('[DOCUMENT_CONTROLLER] Error parsing originalTransactions JSON in history:', parseErr);
-          dbOriginalTransactions = null;
-        }
-      } else {
-        console.log(`[DOCUMENT_CONTROLLER] No originalTransactions in DB for document ${document.id} (checked both originalTransactions and original_transactions fields)`);
-        // Debug: log all available fields to see what's actually there
-        console.log(`[DOCUMENT_CONTROLLER] Available fields on document:`, Object.keys(document.toJSON()));
+      const dbOriginalTransactions = parseJsonField(originalTransactionsField, null);
+
+      if (!dbOriginalTransactions && !originalTransactionsField) {
+        console.log(`[DOCUMENT_CONTROLLER] No originalTransactions in DB for document ${document.id}`);
       }
-      
-      // Parse metadata if it exists
-      if (document.metadata) {
-        try {
-          metadata = typeof document.metadata === 'string' 
-            ? JSON.parse(document.metadata) 
-            : document.metadata;
-        } catch (parseErr) {
-          logService.error('[DOCUMENT_CONTROLLER] Error parsing metadata JSON in history:', parseErr);
-          metadata = null;
-        }
-      }
-      
-      // Get flexible extraction data for history
-      let flexibleData = {};
-      try {
-        flexibleData = document.getFlexibleExtractionData();
-      } catch (error) {
-        logService.warn('[DOCUMENT_CONTROLLER] Error getting flexible data in history', {
-          documentId: document.id,
-          error: error.message
-        });
-        flexibleData = {};
-      }
-      
-      // Return enhanced document with parsed data and original amount information
+
+      const metadata = parseMetadata(document);
+      const flexibleData = getFlexibleData(document);
+
       const finalOriginalTransactions = dbOriginalTransactions || originalTransactions;
       console.log(`[DOCUMENT_CONTROLLER] Returning document ${document.id} with originalTransactions: ${finalOriginalTransactions?.length || 0} items`);
-      
+
       return {
         ...document.toJSON(),
         transactions,
@@ -622,14 +276,13 @@ async function getHistory(req, res) {
           original_amount: document.original_amount,
           sign_detection_method: document.sign_detection_method
         },
-        // Include flexible data extraction metadata
         originalStructure: flexibleData.original_structure,
         columnMetadata: flexibleData.column_mappings,
         extractType: flexibleData.extract_type,
         bankType: flexibleData.bank_type,
         formatVersion: flexibleData.format_version,
         preservationMetadata: flexibleData.preservation_metadata,
-        preservedData: document.hasOriginalStructure ? document.hasOriginalStructure() : false
+        preservedData: flexibleData.hasOriginalStructure
       };
     });
     

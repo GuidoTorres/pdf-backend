@@ -43,6 +43,22 @@ const Subscription = sequelize.define('Subscription', {
 });
 
 // Class methods
+Subscription.getDefaultPagesForPlan = function(plan) {
+  switch (plan) {
+    case 'free':
+      return 10;
+    case 'basic':
+      return 50;
+    case 'pro':
+      return 200;
+    case 'enterprise':
+    case 'unlimited':
+      return 999999;
+    default:
+      return null;
+  }
+};
+
 Subscription.resetMonthlyPages = async function() {
   const now = new Date();
   const subscriptionsToReset = await this.findAll({
@@ -54,29 +70,13 @@ Subscription.resetMonthlyPages = async function() {
   });
 
   for (const subscription of subscriptionsToReset) {
-    let newPages;
-    switch (subscription.plan) {
-      case 'free':
-        newPages = 10;
-        break;
-      case 'basic':
-        newPages = 50;
-        break;
-      case 'pro':
-        newPages = 200;
-        break;
-      case 'enterprise':
-        newPages = 999999;
-        break;
-      case 'unlimited':
-        newPages = 999999;
-        break;
-      default:
-        newPages = subscription.pages_remaining;
+    const defaultPages = Subscription.getDefaultPagesForPlan(subscription.plan);
+    if (defaultPages === null) {
+      continue;
     }
 
     await subscription.update({
-      pages_remaining: newPages,
+      pages_remaining: defaultPages,
       renewed_at: now,
       next_reset: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
     });

@@ -46,7 +46,6 @@
   "license": "ISC",
   "dependencies": {
     "@google-cloud/documentai": "^9.0.0",
-    "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
     "axios": "^1.7.2",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.10.3",

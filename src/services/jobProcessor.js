@@ -18,8 +18,11 @@ const pythonScriptPath = path.resolve(__dirname, '../../services/unified_pdf_pro
  */
 export const processJob = async (job) => {
   const { tempFilePath, originalName, userId } = job.data;
-  const jobStartTime = Date.now();
-  
+  const timings = {
+    enqueuedAt: job.data.createdAt ? Date.parse(job.data.createdAt) : Date.now(),
+    workerStartedAt: Date.now(),
+  };
+
   logService.log(`[JOB_PROCESSOR] [${job.id}] Processing: ${originalName} for user ${userId}`);
 
   // Initialize document record in database
@@ -61,7 +64,8 @@ export const processJob = async (job) => {
 
   // Process with automatic cleanup using try-finally
   try {
-    const result = await processWithUnifiedProcessor(tempFilePath, job.id, userId);
+    timings.pythonStartAt = Date.now();
+    const result = await processWithUnifiedProcessor(tempFilePath, job.id, userId, timings);
     
     // Notify that processing is complete, now finalizing
     webSocketManager.notifyJobProgress(userId, {
@@ -121,11 +125,21 @@ export const processJob = async (job) => {
       logService.warn(`[JOB_PROCESSOR] [${job.id}] Page deduction failed but continuing: ${pageError.message}`);
     }
     
+    timings.completedAt = Date.now();
     await updateJobStatus(job.id, 'completed', 'Processing completed', updateData);
-    
-    const processingTime = Date.now() - jobStartTime;
-    logService.log(`[JOB_PROCESSOR] [${job.id}] Completed in ${processingTime}ms`);
-    
+
+    const processingTime = timings.completedAt - timings.workerStartedAt;
+    const queueWaitTime = timings.workerStartedAt - timings.enqueuedAt;
+    logService.info(`[JOB_PROCESSOR] [${job.id}] Completed in ${processingTime}ms`, {
+      queueWaitMs: queueWaitTime,
+      processMs: processingTime,
+    });
+
+    logService.info('[JOB_PROCESSOR] Timings', {
+      jobId: job.id,
+      timings,
+    });
+
     // Log originalTransactions for debugging
     const originalTransactionsCount = result.originalTransactions?.length || 0;
     console.log(`[JOB_PROCESSOR] [${job.id}] About to notify WebSocket completion:`, {
@@ -153,9 +167,15 @@ export const processJob = async (job) => {
     return result;
     
   } catch (error) {
+    timings.failedAt = Date.now();
     logService.error(`[JOB_PROCESSOR] [${job.id}] Processing failed:`, error);
     await updateJobStatus(job.id, 'failed', error.message || 'Unknown processing error');
-    
+
+    logService.info('[JOB_PROCESSOR] Timings', {
+      jobId: job.id,
+      timings,
+    });
+
     // Notify user that job failed
     webSocketManager.notifyJobFailed(userId, {
       jobId: job.id,
@@ -238,10 +258,10 @@ async function updateJobStatus(jobId, status, step, additionalData = {}) {
  * @param {string} userId - User ID for WebSocket notifications
  * @returns {Promise<Object>} Processing result
  */
-async function processWithUnifiedProcessor(pdfPath, jobId, userId) {
+async function processWithUnifiedProcessor(pdfPath, jobId, userId, timings) {
   return new Promise((resolve, reject) => {
     logService.log(`[JOB_PROCESSOR] [${jobId}] Starting UnifiedPdfProcessor...`);
-    
+
     // Notify that PDF processing has started
     webSocketManager.notifyJobProgress(userId, {
       jobId: jobId,
@@ -261,14 +281,14 @@ async function processWithUnifiedProcessor(pdfPath, jobId, userId) {
     const pythonProcess = spawn('python3', [pythonScriptPath, pdfPath, '--debug'], {
       env: env
     });
-    
+
     let stdoutBuffer = '';
     let errorOutput = '';
 
     pythonProcess.stdout.on('data', (data) => {
       const output = data.toString();
       stdoutBuffer += output;
-      
+
       // Handle progress updates
       const lines = output.split('\n');
       lines.forEach(line => {
@@ -277,7 +297,10 @@ async function processWithUnifiedProcessor(pdfPath, jobId, userId) {
             const progressData = JSON.parse(line);
             if (progressData.status === 'progress') {
               logService.log(`[JOB_PROCESSOR] [${jobId}] ${progressData.step}`);
-              
+              if (progressData.step && !timings.firstProgressAt) {
+                timings.firstProgressAt = Date.now();
+              }
+
               // Notify WebSocket clients about progress
               webSocketManager.notifyJobProgress(userId, {
                 jobId: jobId,
@@ -301,7 +324,8 @@ async function processWithUnifiedProcessor(pdfPath, jobId, userId) {
     pythonProcess.on('close', (code) => {
       if (code === 0) {
         logService.log(`[JOB_PROCESSOR] [${jobId}] UnifiedPdfProcessor completed successfully`);
-        
+        timings.pythonCompletedAt = Date.now();
+
         // Extract result from output markers
         const resultStartMarker = '___RESULT_START___';
         const resultEndMarker = '___RESULT_END___';
@@ -320,11 +344,11 @@ async function processWithUnifiedProcessor(pdfPath, jobId, userId) {
             logService.log(`[JOB_PROCESSOR] [${jobId}] Result: ${result.success ? 'SUCCESS' : 'FAILED'}, ` +
                        `${result.transactions?.length || 0} transactions, ` +
                        `${result.processing_time?.toFixed(2) || 0}s`);
-            
+
             if (!result.transactions || result.transactions.length === 0) {
               logService.warn(`[JOB_PROCESSOR] [${jobId}] No transactions found in result`);
             }
-            
+
             resolve(result);
           } catch (parseErr) {
             logService.error(`[JOB_PROCESSOR] [${jobId}] JSON parse error:`, parseErr);

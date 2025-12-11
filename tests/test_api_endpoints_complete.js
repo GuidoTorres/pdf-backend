@@ -218,13 +218,14 @@ class APIEndpointsTest {
   async testWebhookEndpoints() {
     const endpoints = [
       {
-        name: 'POST /webhooks/lemonsqueezy',
+        name: 'POST /webhooks/paddle',
         test: async () => {
           try {
             // Test webhook endpoint (should fail without proper signature)
-            const response = await axios.post(`${BASE_URL}/webhooks/lemonsqueezy`, {
-              data: { type: 'subscription_created' }
-            });
+            await axios.post(
+              `${BASE_URL}/webhooks/paddle`,
+              new URLSearchParams({ alert_name: 'subscription_created' })
+            );
             return false; // Should not succeed without signature
           } catch (error) {
             // Should fail with 400 or 401

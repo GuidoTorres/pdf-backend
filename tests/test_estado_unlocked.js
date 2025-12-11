@@ -78,7 +78,7 @@ async function testEstadoUnlocked() {
     
     // Paso 3: Verificar resultados en la base de datos
     console.log('\n🗄️  Paso 3: Verificando resultados en la base de datos...');
-    const document = await databaseService.getDocument(job.id.toString());
+    const document = await databaseService.getDocumentByJobId(job.id.toString());
     
     if (!document) {
       console.error('❌ Documento no encontrado en la base de datos');

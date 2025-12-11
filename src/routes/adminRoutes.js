@@ -93,6 +93,7 @@ router.get('/subscriptions/stats', adminController.getSubscriptionStats);
  * GET /api/admin/system/health
  */
 router.get('/system/health', adminController.getSystemHealth);
+router.get('/system/metrics-processing', adminController.getProcessingMetrics);
 
 /**
  * Get error logs and system issues

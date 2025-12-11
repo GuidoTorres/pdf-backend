@@ -147,7 +147,7 @@ mysql -u stamentai_user -p stamentai
 
 ### payment_logs
 
-- Eventos de Lemon Squeezy
+- Eventos de Paddle
 - Historial de pagos
 - Webhooks procesados
 

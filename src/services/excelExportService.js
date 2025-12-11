@@ -1,6 +1,5 @@
 import logService from './logService.js';
-import path from 'path';
-import os from 'os';
+import { getFlexibleData, parseTransactions } from '../utils/documentDataUtils.js';
 
 /**
  * Excel Export Service for preserving original data structure
@@ -32,7 +31,7 @@ class ExcelExportService {
       workbook.lastPrinted = new Date();
 
       // Get flexible extraction data
-      const flexibleData = this.getFlexibleExtractionData(document);
+      const flexibleData = getFlexibleData(document);
       
       // Create sheets based on original structure
       if (flexibleData.hasOriginalStructure) {
@@ -53,52 +52,13 @@ class ExcelExportService {
   }
 
   /**
-   * Get flexible extraction data from document
-   * @param {Object} document - Document object
-   * @returns {Object} Flexible extraction data
-   */
-  getFlexibleExtractionData(document) {
-    try {
-      // Try to get flexible data using the document method if available
-      if (typeof document.getFlexibleExtractionData === 'function') {
-        return {
-          ...document.getFlexibleExtractionData(),
-          hasOriginalStructure: document.hasOriginalStructure ? document.hasOriginalStructure() : false
-        };
-      }
-
-      // Fallback: extract from document properties directly
-      return {
-        original_structure: document.original_structure || null,
-        column_mappings: document.column_mappings || null,
-        extract_type: document.extract_type || null,
-        bank_type: document.bank_type || null,
-        format_version: document.format_version || null,
-        preservation_metadata: document.preservation_metadata || null,
-        hasOriginalStructure: !!(document.original_structure || document.column_mappings)
-      };
-    } catch (error) {
-      this.logger.warn('[EXCEL_EXPORT] Error getting flexible extraction data:', error);
-      return {
-        original_structure: null,
-        column_mappings: null,
-        extract_type: null,
-        bank_type: null,
-        format_version: null,
-        preservation_metadata: null,
-        hasOriginalStructure: false
-      };
-    }
-  }
-
-  /**
    * Create sheets based on original document structure
    * @param {ExcelJS.Workbook} workbook - Excel workbook
    * @param {Object} document - Document with transactions
    * @param {Object} flexibleData - Flexible extraction data
    */
   async createOriginalStructureSheets(workbook, document, flexibleData) {
-    const transactions = this.parseTransactions(document.transactions);
+    const transactions = parseTransactions(document);
     
     if (!transactions || transactions.length === 0) {
       this.logger.warn('[EXCEL_EXPORT] No transactions found for original structure export');
@@ -313,7 +273,7 @@ class ExcelExportService {
    */
   async createNormalizedSheet(workbook, document) {
     const worksheet = workbook.addWorksheet('Transactions');
-    const transactions = this.parseTransactions(document.transactions);
+    const transactions = parseTransactions(document);
     
     if (!transactions || transactions.length === 0) {
       worksheet.addRow(['No transactions found']);
@@ -370,7 +330,7 @@ class ExcelExportService {
     worksheet.addRow([]);
 
     // Transaction statistics
-    const transactions = this.parseTransactions(document.transactions);
+    const transactions = parseTransactions(document);
     const stats = this.calculateTransactionStats(transactions);
     
     worksheet.addRow(['TRANSACTION STATISTICS']);
@@ -411,25 +371,6 @@ class ExcelExportService {
    * @param {string|Array} transactions - Transactions data
    * @returns {Array} Parsed transactions array
    */
-  parseTransactions(transactions) {
-    if (!transactions) return [];
-    
-    if (typeof transactions === 'string') {
-      try {
-        return JSON.parse(transactions);
-      } catch (error) {
-        this.logger.error('[EXCEL_EXPORT] Error parsing transactions JSON:', error);
-        return [];
-      }
-    }
-    
-    if (Array.isArray(transactions)) {
-      return transactions;
-    }
-    
-    return [];
-  }
-
   /**
    * Calculate transaction statistics
    * @param {Array} transactions - Array of transactions
